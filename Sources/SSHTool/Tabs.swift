@@ -529,11 +529,17 @@ struct MainView: View {
     @EnvironmentObject private var tabs: TabManager
     @EnvironmentObject private var serial: SerialMonitor
 
+    @StateObject private var sidebarWidth = SidebarWidth()
+
+    // Vlastní rozložení místo NavigationSplitView: novější macOS SDK u NavigationSplitView vyhrazuje
+    // nahoře místo pro toolbar (velká mezera) a se skrytým toolbarem schová i tlačítka okna.
     var body: some View {
-        NavigationSplitView(columnVisibility: $tabs.sidebar) {
-            SessionListView()
-                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 420)
-        } detail: {
+        HStack(spacing: 0) {
+            if tabs.sidebar != .detailOnly {
+                SessionListView()
+                    .frame(width: sidebarWidth.value)
+                SidebarResizeHandle(width: sidebarWidth)
+            }
             VStack(spacing: 0) {
                 if tabs.focusMode {
                     // pruh pro semafor okna a tažení; dvojklik = ukončit režim soustředění
@@ -582,9 +588,9 @@ struct MainView: View {
             }
             .background(UI.app)
         }
-        .navigationTitle(tabs.selected?.title ?? "SSHTool")
-        .toolbar(.hidden, for: .windowToolbar)     // žádný pruh s názvem a systémovým tlačítkem panelu
-        .ignoresSafeArea(.container, edges: .top)
+        .background(UI.sidebar)
+        .ignoresSafeArea(.container, edges: .top)   // obsah až pod průhlednou titulkovou lištu
+        .background(WindowConfigurator(title: tabs.selected?.title ?? "SSHTool"))
         .sheet(isPresented: $tabs.showPicker) {
             QuickConnectView().environmentObject(store).environmentObject(tabs)
         }
@@ -1191,5 +1197,74 @@ struct SnippetMenuItems: View {
                 Button("Vložit a spustit") { tabs.insertSnippet(s, run: true) }
             }
         }
+    }
+}
+
+
+// MARK: - Okno a levý panel
+
+/// Šířka levého panelu (pamatuje se mezi spuštěními).
+final class SidebarWidth: ObservableObject {
+    static let range: ClosedRange<CGFloat> = 220...460
+    @Published var value: CGFloat {
+        didSet { UserDefaults.standard.set(Double(value), forKey: "SSHToolSidebarWidth") }
+    }
+    var dragStart: CGFloat?
+    init() {
+        let v = UserDefaults.standard.double(forKey: "SSHToolSidebarWidth")
+        value = v > 0 ? min(max(CGFloat(v), Self.range.lowerBound), Self.range.upperBound) : 290
+    }
+}
+
+/// Táhlo mezi levým panelem a terminálem (1 px čára, 7 px úchop). Dvojklik = výchozí šířka.
+struct SidebarResizeHandle: View {
+    @ObservedObject var width: SidebarWidth
+
+    var body: some View {
+        Rectangle().fill(UI.border).frame(width: 1)
+            .overlay(
+                Color.clear.frame(width: 7).contentShape(Rectangle())
+                    .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+                    .gesture(DragGesture(minimumDistance: 1)
+                        .onChanged { g in
+                            let start = width.dragStart ?? width.value
+                            if width.dragStart == nil { width.dragStart = start }
+                            width.value = min(max(start + g.translation.width, SidebarWidth.range.lowerBound),
+                                              SidebarWidth.range.upperBound)
+                        }
+                        .onEnded { _ in width.dragStart = nil })
+                    .onTapGesture(count: 2) { width.value = 290 }
+            )
+    }
+}
+
+/// Nastaví okno přímo přes AppKit: průhledná titulková lišta bez názvu, obsah pod ní,
+/// viditelná tlačítka okna (zavřít / minimalizovat / celá obrazovka) – nezávisle na verzi SDK.
+struct WindowConfigurator: NSViewRepresentable {
+    let title: String
+
+    final class V: NSView {
+        var title = ""
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configure()
+        }
+        func configure() {
+            guard let w = window else { return }
+            w.title = title
+            w.titleVisibility = .hidden
+            w.titlebarAppearsTransparent = true
+            w.styleMask.insert(.fullSizeContentView)
+            w.toolbar = nil
+            for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                w.standardWindowButton(b)?.isHidden = false
+            }
+        }
+    }
+
+    func makeNSView(context: Context) -> V { let v = V(); v.title = title; return v }
+    func updateNSView(_ v: V, context: Context) {
+        v.title = title
+        DispatchQueue.main.async { v.configure() }
     }
 }
