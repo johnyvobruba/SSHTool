@@ -1,0 +1,23 @@
+# Build
+.build/
+build/
+*.app
+*.zip
+*.zip.sig
+
+# Lokální a citlivá data – nikdy do repozitáře
+import/
+backup-*/
+*.orig
+*.pcap
+*.cap
+*.log
+.sshtool-update-signing-key
+*signing-key*
+!scripts/generate-update-key.swift
+*.pem
+*.p12
+.env
+
+# macOS
+.DS_Store

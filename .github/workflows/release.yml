@@ -1,0 +1,69 @@
+# Sestaví SSHTool a při nové verzi (VERSION v build-app.sh) automaticky vydá GitHub Release.
+# Aplikace si release najde (Nastavení → O aplikaci / menu Zkontrolovat aktualizace) a ověří podpis.
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write          # vytvoření tagu a releasu (vestavěný GITHUB_TOKEN, žádný osobní token)
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verze
+        id: v
+        run: |
+          VERSION=$(sed -nE 's/^VERSION="\$\{VERSION_OVERRIDE:-([0-9.]+)\}"/\1/p' build-app.sh)
+          [ -n "$VERSION" ] || { echo "Verze nenalezena v build-app.sh"; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then echo "release=false" >> "$GITHUB_OUTPUT"; else echo "release=true" >> "$GITHUB_OUTPUT"; fi
+          echo "Verze $VERSION"
+
+      - name: Build
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+        run: ./build-app.sh
+
+      - name: Balíček a podpis
+        if: steps.v.outputs.release == 'true'
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          V=${{ steps.v.outputs.version }}
+          ditto -c -k --keepParent build/SSHTool.app "SSHTool-$V.zip"
+          shasum -a 256 "SSHTool-$V.zip" | tee "SSHTool-$V.zip.sha256"
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            swift scripts/sign-update.swift "SSHTool-$V.zip"
+          else
+            echo "::warning::Chybí secret UPDATE_SIGNING_KEY – release bude bez podpisu a aplikace ho nenainstaluje automaticky."
+          fi
+
+      - name: Poznámky k vydání z CHANGELOG.md
+        if: steps.v.outputs.release == 'true'
+        run: |
+          V=${{ steps.v.outputs.version }}
+          awk -v v="## $V" 'index($0, v)==1 {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md || true
+          [ -s notes.md ] || echo "SSHTool $V" > notes.md
+          cat notes.md
+
+      - name: GitHub Release
+        if: steps.v.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=${{ steps.v.outputs.version }}
+          FILES="SSHTool-$V.zip SSHTool-$V.zip.sha256"
+          [ -f "SSHTool-$V.zip.sig" ] && FILES="$FILES SSHTool-$V.zip.sig"
+          gh release create "v$V" $FILES --title "SSHTool $V" --notes-file notes.md --target "$GITHUB_SHA"
