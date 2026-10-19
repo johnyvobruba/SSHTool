@@ -269,3 +269,13 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Automatické vydání: při změně verze v `build-app.sh` na větvi `main` se aplikace sestaví na macOS runneru a publikuje jako GitHub Release (`SSHTool-x.y.z.zip`, `.sha256`, `.sig`).
 - Aktualizace v aplikaci: kontrola při spuštění (max. 4× denně, vypnutelná) a menu SSHTool → Zkontrolovat aktualizace…; po potvrzení stáhne, ověří podpis Ed25519, nahradí aplikaci (stará verze do Koše) a restartuje.
 - `./publish.sh`: kontroly před publikací (verze, CHANGELOG, citlivé soubory a tajné údaje, privátní IP, zkušební build), souhrn, commit a push.
+
+## 0.24.0
+
+- **Soubory serveru (SFTP prohlížeč)** – panel vpravo vedle terminálu (⇧⌘E, ikona složky v liště záložek, menu Terminál):
+  - procházení souborového systému serveru (dvojklik do složky, ↑ o úroveň výš, domovská složka, zadání cesty, skryté soubory),
+  - **↑ Nahrát**: výběr souborů / složek z Macu do aktuální složky serveru, nebo přetažení z Finderu do panelu (dotaz při přepsání),
+  - **↓ Stáhnout**: vybrané soubory / složky do Macu (jeden soubor → dialog Uložit, více → výběr složky), dvojklik na soubor = stáhnout,
+  - nová složka, přejmenování, smazání (s potvrzením), kopírování cesty a vložení cesty do terminálu,
+  - seznam přenosů se stavem a „Zobrazit ve Finderu“.
+- Běží přes stejné přihlášené SSH spojení (ControlMaster) – bez nového přihlášení, funguje i s heslem / Touch ID. U PROD serverů se zápisy potvrzují.

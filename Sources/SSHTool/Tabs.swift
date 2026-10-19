@@ -35,6 +35,16 @@ final class TerminalTab: ObservableObject, Identifiable {
 
     var canMonitor: Bool { kind == .ssh && running && view.controlPath != nil }
 
+    /// Prohlížeč souborů (SFTP) přes spojení této záložky – vytváří se při prvním otevření panelu.
+    private(set) var filesBrowser: SFTPBrowser?
+    func browser() -> SFTPBrowser? {
+        if filesBrowser == nil, canMonitor, let cp = view.controlPath {
+            filesBrowser = SFTPBrowser(controlPath: cp, destination: session.destinationString,
+                                       sessionName: session.name, production: session.envTag == "prod")
+        }
+        return filesBrowser
+    }
+
     func startMonitor() {
         guard canMonitor, monitor == nil, let cp = view.controlPath else { return }
         monitor = RemoteMonitor(controlPath: cp, destination: session.destinationString)
@@ -133,6 +143,20 @@ final class TabManager: ObservableObject {
     @Published var showCapture = false          // ⌥⌘P – průvodce tcpdump / fw monitor
     let capture = CaptureModel()                // parametry zůstávají mezi otevřeními
     @Published var liveCapture: LiveCapture?    // živý odchyt do Wiresharku (jeden současně)
+    @Published var showFiles = false            // ⇧⌘E – panel souborů serveru (SFTP)
+
+    func toggleFiles() {
+        if showFiles { showFiles = false; return }
+        guard let t = selected, t.canMonitor else {
+            let a = NSAlert()
+            a.messageText = "Soubory serveru jsou dostupné pro připojenou SSH záložku"
+            a.informativeText = "Připoj se k serveru přes SSH (ne SFTP záložku) a panel otevři znovu – použije stejné přihlášení."
+            a.runModal()
+            return
+        }
+        _ = t.browser()
+        showFiles = true
+    }
     @Published var quickTarget = ""
     /// Broadcast: vstup z aktivní relace se posílá i do ostatních (viz broadcastTargets).
     @Published var broadcast = false
@@ -525,12 +549,22 @@ struct MainView: View {
                     TabBar()
                     Rectangle().fill(UI.border).frame(height: 1)
                 }
-                if let p = tabs.panes, p.count >= 2 {
-                    PanesView(ids: p)
-                } else if let tab = tabs.selected {
-                    TerminalWithOverlay(tab: tab, focus: true)
-                } else {
-                    EmptyTabsView()
+                HStack(spacing: 0) {
+                    Group {
+                        if let p = tabs.panes, p.count >= 2 {
+                            PanesView(ids: p)
+                        } else if let tab = tabs.selected {
+                            TerminalWithOverlay(tab: tab, focus: true)
+                        } else {
+                            EmptyTabsView()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if tabs.showFiles, let t = tabs.selected, let b = t.browser() {
+                        Rectangle().fill(UI.border).frame(width: 1)
+                        FileBrowserPanel(b: b).frame(width: 430)
+                            .id(t.id)                    // každá záložka má vlastní prohlížeč
+                    }
                 }
                 if tabs.focusMode && !store.settings.focusShowStatus {
                     EmptyView()
@@ -807,6 +841,11 @@ struct TabBar: View {
             .foregroundStyle(UI.textSecondary)
             .disabled(tabs.selected == nil)
             .help("Snippety – uložené příkazy")
+
+            Button { tabs.toggleFiles() } label: { chromeButton("folder", active: tabs.showFiles) }
+                .buttonStyle(.plain)
+                .disabled(tabs.selected == nil)
+                .help("Soubory serveru – procházení, nahrání ↑ a stažení ↓ (⇧⌘E)")
 
             Button { tabs.showCapture = true } label: { chromeButton("waveform.path.ecg") }
                 .buttonStyle(.plain)

@@ -73,6 +73,9 @@ struct SSHToolApp: App {
             CommandMenu("Terminál") {
                 Button("Broadcast vstupu do více relací…") { tabs.toggleBroadcast() }
                     .keyboardShortcut("i", modifiers: [.command, .shift])
+                Button("Soubory serveru (SFTP)") { tabs.toggleFiles() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    .disabled(tabs.selected == nil)
                 Button("Zachytávání paketů (tcpdump / fw monitor)…") { tabs.showCapture = true }
                     .keyboardShortcut("p", modifiers: [.command, .option])
                     .disabled(tabs.selected == nil)
