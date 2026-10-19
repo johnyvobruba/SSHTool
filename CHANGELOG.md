@@ -284,4 +284,4 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 
 - **SFTP záložka = grafický prohlížeč souborů**: „Otevřít SFTP“ (⇧⌘S, menu serveru, +) teď otevře procházení serveru s tlačítky ↑ Nahrát / ↓ Stáhnout, přetažením z Finderu a kontextovým menu. Pod seznamem je malý terminál pro přihlášení (heslo / OTP / potvrzení klíče serveru); prohlížeč počká na přihlášení a pak otevře domovskou složku.
 - Panel souborů u SSH záložky (⇧⌘E) zůstává.
-- Oprava vzhledu horní lišty u verze stažené z GitHubu (příliš vysoká lišta, chybějící tlačítka okna): vydání se sestavuje s Xcode 16 / macOS 15 SDK jako lokální build a aplikace má zapnutý kompatibilní vzhled (UIDesignRequiresCompatibility).
+- Oprava vzhledu horní lišty u verze stažené z GitHubu (příliš vysoká lišta, chybějící tlačítka okna): aplikace má zapnutý kompatibilní vzhled (UIDesignRequiresCompatibility), takže nové SDK nemění vzhled oken.
