@@ -371,6 +371,19 @@ struct TerminalWithOverlay: View {
     let focus: Bool
 
     var body: some View {
+        if tab.kind == .sftp, let b = tab.browser() {
+            // SFTP záložka: prohlížeč souborů + malý terminál pro přihlášení / stav spojení
+            VStack(spacing: 0) {
+                FileBrowserPanel(b: b, embedded: true)
+                Rectangle().fill(UI.border).frame(height: 1)
+                terminal.frame(height: 96)
+            }
+        } else {
+            terminal
+        }
+    }
+
+    private var terminal: some View {
         TerminalHost(target: tab.view, focus: focus)
             .overlay(alignment: .topTrailing) {
                 if !tab.running && !tab.overlayDismissed {

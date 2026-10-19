@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.24.0}"
+VERSION="${VERSION_OVERRIDE:-0.24.1}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -61,6 +61,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>UIDesignRequiresCompatibility</key><true/>
   <key>CFBundleDevelopmentRegion</key><string>cs</string>
   <key>CFBundleLocalizations</key><array><string>cs</string></array>
   <key>SSHToolUpdateRepo</key><string>${UPDATE_REPO}</string>

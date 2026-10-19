@@ -279,3 +279,9 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - nová složka, přejmenování, smazání (s potvrzením), kopírování cesty a vložení cesty do terminálu,
   - seznam přenosů se stavem a „Zobrazit ve Finderu“.
 - Běží přes stejné přihlášené SSH spojení (ControlMaster) – bez nového přihlášení, funguje i s heslem / Touch ID. U PROD serverů se zápisy potvrzují.
+
+## 0.24.1
+
+- **SFTP záložka = grafický prohlížeč souborů**: „Otevřít SFTP“ (⇧⌘S, menu serveru, +) teď otevře procházení serveru s tlačítky ↑ Nahrát / ↓ Stáhnout, přetažením z Finderu a kontextovým menu. Pod seznamem je malý terminál pro přihlášení (heslo / OTP / potvrzení klíče serveru); prohlížeč počká na přihlášení a pak otevře domovskou složku.
+- Panel souborů u SSH záložky (⇧⌘E) zůstává.
+- Oprava vzhledu horní lišty u verze stažené z GitHubu (příliš vysoká lišta, chybějící tlačítka okna): vydání se sestavuje s Xcode 16 / macOS 15 SDK jako lokální build a aplikace má zapnutý kompatibilní vzhled (UIDesignRequiresCompatibility).

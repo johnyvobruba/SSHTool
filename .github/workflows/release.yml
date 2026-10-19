@@ -22,9 +22,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Xcode (nejnovější na runneru)
+      - name: Xcode 16 (macOS 15 SDK – stejný vzhled jako lokální build)
         run: |
-          XC=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          XC=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$XC" ] || XC=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
           [ -n "$XC" ] && sudo xcode-select -s "$XC"
           xcodebuild -version
           swift --version

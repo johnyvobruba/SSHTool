@@ -35,10 +35,13 @@ final class TerminalTab: ObservableObject, Identifiable {
 
     var canMonitor: Bool { kind == .ssh && running && view.controlPath != nil }
 
+    /// SSH i SFTP záložka mají ControlMaster → lze procházet soubory serveru.
+    var canBrowse: Bool { (kind == .ssh || kind == .sftp) && running && view.controlPath != nil }
+
     /// Prohlížeč souborů (SFTP) přes spojení této záložky – vytváří se při prvním otevření panelu.
     private(set) var filesBrowser: SFTPBrowser?
     func browser() -> SFTPBrowser? {
-        if filesBrowser == nil, canMonitor, let cp = view.controlPath {
+        if filesBrowser == nil, canBrowse, let cp = view.controlPath {
             filesBrowser = SFTPBrowser(controlPath: cp, destination: session.destinationString,
                                        sessionName: session.name, production: session.envTag == "prod")
         }
@@ -147,7 +150,7 @@ final class TabManager: ObservableObject {
 
     func toggleFiles() {
         if showFiles { showFiles = false; return }
-        guard let t = selected, t.canMonitor else {
+        guard let t = selected, t.canBrowse else {
             let a = NSAlert()
             a.messageText = "Soubory serveru jsou dostupné pro připojenou SSH záložku"
             a.informativeText = "Připoj se k serveru přes SSH (ne SFTP záložku) a panel otevři znovu – použije stejné přihlášení."
@@ -560,7 +563,7 @@ struct MainView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if tabs.showFiles, let t = tabs.selected, let b = t.browser() {
+                    if tabs.showFiles, let t = tabs.selected, t.kind == .ssh, let b = t.browser() {
                         Rectangle().fill(UI.border).frame(width: 1)
                         FileBrowserPanel(b: b).frame(width: 430)
                             .id(t.id)                    // každá záložka má vlastní prohlížeč

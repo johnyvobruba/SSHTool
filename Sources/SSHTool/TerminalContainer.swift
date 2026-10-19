@@ -122,9 +122,13 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             process.startProcess(executable: "/usr/bin/ssh", args: session.sshArguments(controlPath: cp),
                                  environment: envList, execName: "ssh")
         case .sftp:
-            feed(text: "\u{1B}[2m[SFTP – příkazy: ls, cd, lcd, get, put, mkdir, help. Soubor z Finderu sem můžeš přetáhnout.]\u{1B}[0m\r\n")
-            process.startProcess(executable: "/usr/bin/sftp", args: session.sftpArguments(),
-                                 environment: envList, execName: "sftp")
+            // SFTP záložka = grafický prohlížeč souborů. ssh tu jen drží přihlášené spojení (ControlMaster, -N);
+            // přihlášení (heslo / OTP / potvrzení klíče serveru) probíhá v tomto terminálu pod prohlížečem.
+            let cp = RemoteMonitor.controlPath(for: UUID())
+            controlPath = cp
+            feed(text: "\u{1B}[2m[Přihlašování pro prohlížeč souborů – případné heslo / OTP zadej sem. Soubory se zobrazí nahoře.]\u{1B}[0m\r\n")
+            process.startProcess(executable: "/usr/bin/ssh", args: ["-N"] + session.sshArguments(controlPath: cp),
+                                 environment: envList, execName: "ssh")
         case .local:
             let shell = env["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
             process.startProcess(executable: shell, args: ["-l"], environment: envList,

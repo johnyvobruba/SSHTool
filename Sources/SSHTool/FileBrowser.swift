@@ -38,6 +38,7 @@ final class SFTPBrowser: ObservableObject {
     @Published private(set) var transfers: [Transfer] = []
     @Published var showHidden = false
     @Published var dropTargeted = false
+    @Published private(set) var waiting = false
 
     let controlPath: String
     let destination: String
@@ -50,7 +51,33 @@ final class SFTPBrowser: ObservableObject {
         self.destination = destination
         self.sessionName = sessionName
         self.production = production
-        Task { await self.goHome() }
+        Task { await self.waitForLogin() }
+    }
+
+    /// Počká, až je hlavní SSH spojení přihlášené (socket ControlMaster odpovídá), pak otevře domovskou složku.
+    private func waitForLogin() async {
+        let cp = controlPath, dest = destination
+        for i in 0..<180 {                                        // až 3 minuty (heslo, OTP, Touch ID)
+            let ready = await Task.detached { Self.masterReady(cp, dest) }.value
+            if ready { waiting = false; await goHome(); return }
+            if i == 1 { waiting = true }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        waiting = false
+        error = "Spojení se nepřihlásilo do 3 minut – zkontroluj terminál pod seznamem (⌘R = znovu připojit)."
+    }
+
+    nonisolated static func masterReady(_ cp: String, _ dest: String) -> Bool {
+        guard FileManager.default.fileExists(atPath: cp) else { return false }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        p.arguments = ["-S", cp, "-O", "check", dest]
+        p.standardInput = FileHandle.nullDevice
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return false }
+        p.waitUntilExit()
+        return p.terminationStatus == 0
     }
 
     var visibleEntries: [Entry] { showHidden ? entries : entries.filter { !$0.name.hasPrefix(".") } }
@@ -326,6 +353,7 @@ final class SFTPBrowser: ObservableObject {
 
 struct FileBrowserPanel: View {
     @ObservedObject var b: SFTPBrowser
+    var embedded = false                // součást SFTP záložky (bez tlačítka zavřít)
     @EnvironmentObject private var tabs: TabManager
 
     private var selected: [SFTPBrowser.Entry] { b.visibleEntries.filter { b.selection.contains($0.id) } }
@@ -345,11 +373,13 @@ struct FileBrowserPanel: View {
             // záhlaví
             HStack(spacing: 6) {
                 Image(systemName: "folder").foregroundStyle(UI.accent)
-                Text("Soubory · \(b.sessionName)").font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text((embedded ? "SFTP · " : "Soubory · ") + b.sessionName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
                 if b.production { EnvBadge(tag: "prod") }
                 Spacer()
-                Button { tabs.showFiles = false } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
-                    .buttonStyle(.plain).foregroundStyle(UI.textTertiary).help("Zavřít panel (⇧⌘E)")
+                if !embedded {
+                    Button { tabs.showFiles = false } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
+                        .buttonStyle(.plain).foregroundStyle(UI.textTertiary).help("Zavřít panel (⇧⌘E)")
+                }
             }
             .padding(.horizontal, 10).frame(height: 30).background(UI.chrome)
 
@@ -381,6 +411,14 @@ struct FileBrowserPanel: View {
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(UI.border, lineWidth: 1))
             .padding(.horizontal, 8).padding(.bottom, 6)
 
+            if b.waiting {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text("Čekám na přihlášení… (heslo / OTP zadej v terminálu dole)").font(.system(size: 11))
+                        .foregroundStyle(UI.textSecondary)
+                }
+                .padding(.horizontal, 10).padding(.bottom, 6)
+            }
             if let err = b.error {
                 Label(err, systemImage: "exclamationmark.triangle").font(.system(size: 11))
                     .foregroundStyle(UI.error).padding(.horizontal, 10).padding(.bottom, 6)
