@@ -16,11 +16,18 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Xcode (nejnovější na runneru)
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$XC" ] && sudo xcode-select -s "$XC"
+          xcodebuild -version
+          swift --version
 
       - name: Verze
         id: v
@@ -34,7 +41,7 @@ jobs:
       - name: Build
         env:
           GITHUB_REPO: ${{ github.repository }}
-        run: ./build-app.sh
+        run: bash ./build-app.sh       # bash explicitně – nezávisí na příznaku spustitelnosti v gitu
 
       - name: Balíček a podpis
         if: steps.v.outputs.release == 'true'
