@@ -147,6 +147,7 @@ struct GroupHeaderRow: View {
     let collapsed: Bool
     var icon: String? = nil
     var color: SwiftUI.Color? = nil
+    var depth = 0
     let toggle: () -> Void
     @StateObject private var hover = HoverModel()
 
@@ -169,7 +170,8 @@ struct GroupHeaderRow: View {
         .foregroundStyle(hover.on ? UI.text : UI.textSecondary)
         .padding(.horizontal, 6).padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: 5).fill(hover.on ? UI.card.opacity(0.6) : SwiftUI.Color.clear))
-        .padding(.top, 12)
+        .padding(.top, depth == 0 ? 12 : 2)
+        .padding(.leading, CGFloat(depth) * 14)
         .contentShape(Rectangle())
         .onHover { hover.on = $0 }
         .onTapGesture(perform: toggle)

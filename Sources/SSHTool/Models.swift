@@ -374,7 +374,52 @@ final class AppStore: ObservableObject {
     }
 
     /// Názvy existujících skupin (pro výběr v editoru a „Přesunout do skupiny“).
-    var groupNames: [String] { groupedSessions.map(\.group) }
+    // MARK: Složky (stromová struktura: skupina = cesta „A/B/C“)
+
+    /// Normalizovaná cesta složky: bez prázdných částí a mezer kolem „/“.
+    static func normPath(_ p: String) -> String {
+        p.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: "/")
+    }
+
+    /// Všechny složky včetně nadřazených a prázdných, seřazené.
+    var groupNames: [String] {
+        var set = Set<String>()
+        for g in sessions.map(\.group) + settings.folders {
+            let parts = g.split(separator: "/").map(String.init)
+            for i in parts.indices { set.insert(parts[...i].joined(separator: "/")) }
+        }
+        return set.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// Je cesta `p` v podstromu složky `root` (včetně jí samotné)?
+    static func inSubtree(_ p: String, _ root: String) -> Bool { p == root || p.hasPrefix(root + "/") }
+
+    func createFolder(_ path: String) {
+        let p = Self.normPath(path)
+        guard !p.isEmpty, !groupNames.contains(p) else { return }
+        settings.folders.append(p)
+        let parts = p.split(separator: "/").map(String.init)      // rozbalit cestu k nové složce
+        for i in parts.indices.dropLast() {
+            let a = parts[...i].joined(separator: "/")
+            if isGroupCollapsed(a) { toggleGroup(a) }
+        }
+    }
+
+    /// Přesune složku (s celým obsahem) do jiné složky; nil = do kořene.
+    func moveFolder(_ path: String, into parent: String?) {
+        if let parent, Self.inSubtree(parent, path) { NSSound.beep(); return }   // ne do sebe / svého potomka
+        let leaf = path.split(separator: "/").last.map(String.init) ?? path
+        renameGroup(path, to: parent.map { $0 + "/" + leaf } ?? leaf)
+        if let parent, isGroupCollapsed(parent) { toggleGroup(parent) }
+    }
+
+    /// Smaže složku – jen když v ní (ani v podsložkách) nejsou servery.
+    @discardableResult
+    func deleteFolder(_ path: String) -> Bool {
+        guard !sessions.contains(where: { Self.inSubtree($0.group, path) }) else { return false }
+        settings.folders.removeAll { Self.inSubtree($0, path) }
+        return true
+    }
 
     /// Barvy skupin (ruční nebo automatické) – pro výběr skupiny v editoru.
     var groupColors: [String: String] {
@@ -389,12 +434,17 @@ final class AppStore: ObservableObject {
 
     /// Přejmenuje skupinu u všech serverů (včetně barvy a sbalení).
     func renameGroup(_ old: String, to new: String) {
-        let n = new.trimmingCharacters(in: .whitespaces)
+        let n = Self.normPath(new)
         guard !n.isEmpty, n != old else { return }
-        for i in sessions.indices where sessions[i].group == old { sessions[i].group = n }
+        // přejmenuje složku i celý její podstrom (A/B → X/B)
+        func remap(_ g: String) -> String { Self.inSubtree(g, old) ? n + g.dropFirst(old.count) : g }
+        for i in sessions.indices where Self.inSubtree(sessions[i].group, old) { sessions[i].group = remap(sessions[i].group) }
         var s = settings
-        if let c = s.groupColors.removeValue(forKey: old) { s.groupColors[n] = c }
-        s.collapsedGroups = s.collapsedGroups.map { $0 == old ? n : $0 }
+        s.folders = Array(Set(s.folders.map(remap)))
+        var colors: [String: String] = [:]
+        for (k, v) in s.groupColors { colors[remap(k)] = v }
+        s.groupColors = colors
+        s.collapsedGroups = s.collapsedGroups.map(remap)
         settings = s
     }
 

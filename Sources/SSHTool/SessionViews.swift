@@ -32,15 +32,90 @@ struct SessionListView: View {
 
     private static let favoritesKey = "★"
     static let dragPrefix = "sshtool-server:"
+    static let folderPrefix = "sshtool-folder:"
 
-    /// Přesun přetaženého serveru do skupiny.
+    /// Přesun přetaženého serveru nebo celé složky do složky.
     private func dropSession(_ items: [String], to group: String) -> Bool {
-        guard let raw = items.first, raw.hasPrefix(Self.dragPrefix),
+        guard let raw = items.first else { return false }
+        if raw.hasPrefix(Self.folderPrefix) {
+            let path = String(raw.dropFirst(Self.folderPrefix.count))
+            let parent = (path as NSString).deletingLastPathComponent
+            guard path != group, parent != group else { return false }
+            store.moveFolder(path, into: group)
+            return true
+        }
+        guard raw.hasPrefix(Self.dragPrefix),
               let id = UUID(uuidString: String(raw.dropFirst(Self.dragPrefix.count))),
               let s = store.session(id), s.group != group else { return false }
         store.move(id, toGroup: group)
         if store.isGroupCollapsed(group) { store.toggleGroup(group) }   // ukázat, kam server přibyl
         return true
+    }
+
+    // MARK: Strom složek
+
+    final class FolderNode: Identifiable {
+        let path: String
+        let name: String
+        var children: [FolderNode] = []
+        var sessions: [SSHSession] = []
+        var total = 0
+        var id: String { path }
+        init(path: String) {
+            self.path = path
+            name = path.split(separator: "/").last.map(String.init) ?? path
+        }
+    }
+
+    /// Strom složek se servery (při hledání jen větve se shodou).
+    private var tree: [FolderNode] {
+        var nodes: [String: FolderNode] = [:]
+        for p in store.groupNames { nodes[p] = FolderNode(path: p) }
+        for s in store.sessions where matches(s) {
+            let g = AppStore.normPath(s.group).isEmpty ? "Default" : s.group
+            if nodes[g] == nil { nodes[g] = FolderNode(path: g) }
+            nodes[g]!.sessions.append(s)
+        }
+        var roots: [FolderNode] = []
+        for (p, n) in nodes {
+            if let slash = p.lastIndex(of: "/"), let parent = nodes[String(p[..<slash])] { parent.children.append(n) }
+            else { roots.append(n) }
+        }
+        func finish(_ n: FolderNode) -> Int {
+            n.children.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            n.sessions.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            n.total = n.sessions.count + n.children.map(finish).reduce(0, +)
+            if !ui.search.isEmpty { n.children.removeAll { $0.total == 0 } }
+            return n.total
+        }
+        roots.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        roots.forEach { _ = finish($0) }
+        return ui.search.isEmpty ? roots : roots.filter { $0.total > 0 }
+    }
+
+    private func folderView(_ n: FolderNode, depth: Int) -> AnyView {
+        AnyView(Group {
+            GroupHeaderRow(title: depth == 0 ? n.name.uppercased() : n.name, count: n.total,
+                           collapsed: collapsed(n.path),
+                           icon: depth == 0 ? nil : (collapsed(n.path) ? "folder" : "folder.fill"),
+                           color: UI.sessionColor(GroupPalette.color(for: n.path)),
+                           depth: depth) {
+                store.toggleGroup(n.path)
+            }
+            .onDrag { NSItemProvider(object: (Self.folderPrefix + n.path) as NSString) }
+            .onDrop(of: [.plainText, .utf8PlainText, .text],
+                    isTargeted: Binding(get: { ui.dropTarget == n.path },
+                                        set: { setTarget($0, n.path) })) { providers in
+                handleDrop(providers, to: n.path)
+            }
+            .background(RoundedRectangle(cornerRadius: 5)
+                .stroke(UI.accent, lineWidth: ui.dropTarget == n.path ? 1.5 : 0))
+            .contextMenu { groupMenu(n.path) }
+            if !collapsed(n.path) {
+                ForEach(n.children) { c in folderView(c, depth: depth + 1) }
+                ForEach(n.sessions) { s in row(s, inGroup: true, depth: depth + 1) }
+            }
+        })
     }
 
     /// Drop přes NSItemProvider (spolehlivé uvnitř List na macOS – .dropDestination v Listu nereaguje).
@@ -81,13 +156,14 @@ struct SessionListView: View {
 
     /// Řádek serveru: dvojklik = připojit (nebo přejít na otevřenou relaci), pravé tlačítko = menu.
     /// Bez výběru Listu → žádné dvojí zvýraznění; zvýrazněný je jen server aktivní záložky.
-    private func row(_ s: SSHSession, inGroup: Bool = false) -> some View {
+    private func row(_ s: SSHSession, inGroup: Bool = false, depth: Int = 0) -> some View {
         let favVisible = store.settings.showFavorites && s.favorite && !collapsed(Self.favoritesKey)
         return SidebarSessionRow(session: s, state: tabs.state(for: s.id),
                           active: tabs.activeSessionID == s.id && !(inGroup && favVisible),
                           comfortable: store.settings.sidebarComfortable,
                           query: ui.search,
                           toggleFavorite: { store.toggleFavorite(s.id) })
+            .padding(.leading, CGFloat(max(0, depth - 1)) * 14)
             .contentShape(Rectangle())
             .onTapGesture(count: 2) { tabs.openOrFocus(s) }
             .contextMenu { ServerContextMenu(session: s, edit: { ui.editing = s }) }
@@ -112,8 +188,26 @@ struct SessionListView: View {
                 Button("Skrýt sekci Oblíbené") { store.settings.showFavorites = false }
             } else {
                 Divider()
-                Button("Přejmenovat skupinu…") {
-                    if let n = askText("Přejmenovat skupinu", "Nový název skupiny „\(g)“:", initial: g) { store.renameGroup(g, to: n) }
+                Button("Nový server v této složce…") { ui.editing = newSession(in: g) }
+                Button("Nová podsložka…") {
+                    if let n = askText("Nová podsložka", "Název podsložky v „\(g)“:") { store.createFolder(g + "/" + n) }
+                }
+                Divider()
+                Button("Přejmenovat složku…") {
+                    let leaf = g.split(separator: "/").last.map(String.init) ?? g
+                    if let n = askText("Přejmenovat složku", "Nový název složky „\(leaf)“:", initial: leaf), !n.contains("/") {
+                        let parent = (g as NSString).deletingLastPathComponent
+                        store.renameGroup(g, to: parent.isEmpty ? n : parent + "/" + n)
+                    }
+                }
+                Menu("Přesunout do složky") {
+                    if g.contains("/") { Button("Do kořene") { store.moveFolder(g, into: nil) } ; Divider() }
+                    ForEach(store.groupNames.filter { !AppStore.inSubtree($0, g) && $0 != (g as NSString).deletingLastPathComponent }, id: \.self) { t in
+                        Button(t.replacingOccurrences(of: "/", with: " / ")) { store.moveFolder(g, into: t) }
+                    }
+                }
+                if !store.sessions.contains(where: { AppStore.inSubtree($0.group, g) }) {
+                    Button("Smazat prázdnou složku") { store.deleteFolder(g) }
                 }
                 Menu("Barva skupiny") {
                     Button("Automatická") { store.setGroupColor(g, nil) }
@@ -132,6 +226,9 @@ struct SessionListView: View {
                 SidebarSearchField(text: $ui.search)
                 Menu {
                     Button("Nový server…") { ui.editing = newSession() }
+                    Button("Nová složka…") {
+                        if let n = askText("Nová složka", "Název složky (podsložky odděl lomítkem, např. ANECT/Praha):") { store.createFolder(n) }
+                    }
                     Button("Rychlé připojení…  ⇧⌘K") { tabs.showQuickConnect = true }
                     Divider()
                     Button("Sbalit všechny skupiny") { store.collapseAll(true) }
@@ -172,24 +269,7 @@ struct SessionListView: View {
                         ForEach(favorites) { s in row(s) }
                     }
                 }
-                ForEach(grouped, id: \.group) { g in
-                    GroupHeaderRow(title: g.group.uppercased(), count: g.items.count,
-                                   collapsed: collapsed(g.group),
-                                   color: UI.sessionColor(GroupPalette.color(for: g.group))) {
-                        store.toggleGroup(g.group)
-                    }
-                    .onDrop(of: [.plainText, .utf8PlainText, .text],
-                            isTargeted: Binding(get: { ui.dropTarget == g.group },
-                                                set: { setTarget($0, g.group) })) { providers in
-                        handleDrop(providers, to: g.group)
-                    }
-                    .background(RoundedRectangle(cornerRadius: 5)
-                        .stroke(UI.accent, lineWidth: ui.dropTarget == g.group ? 1.5 : 0))
-                    .contextMenu { groupMenu(g.group) }
-                    if !collapsed(g.group) {
-                        ForEach(g.items) { s in row(s, inGroup: true) }
-                    }
-                }
+                ForEach(tree) { n in folderView(n, depth: 0) }
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
@@ -203,8 +283,9 @@ struct SessionListView: View {
     }
 
     /// Nový server – předvyplněná skupina = skupina aktivní záložky (jinak první existující).
-    private func newSession() -> SSHSession {
+    private func newSession(in folder: String? = nil) -> SSHSession {
         var s = SSHSession(name: "", host: "")
+        if let folder { s.colorHex = ""; s.group = folder; return s }
         s.colorHex = ""                        // výchozí: barva skupiny
         s.group = tabs.selected.map { $0.session.group }.flatMap { store.groupNames.contains($0) ? $0 : nil }
             ?? store.groupNames.first ?? "Default"
@@ -659,7 +740,7 @@ private struct GroupPickerPopover: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Hledat nebo nová skupina…", text: $m.groupQuery).textFieldStyle(.plain)
+                TextField("Hledat nebo nová (podsložka: A/B)…", text: $m.groupQuery).textFieldStyle(.plain)
                     .onSubmit { pick(m.groupQuery) }
             }
             .padding(.horizontal, 8).frame(height: 28)
@@ -670,7 +751,7 @@ private struct GroupPickerPopover: View {
                         Button { pick(g) } label: {
                             HStack(spacing: 8) {
                                 Circle().fill(Color(hex: groupColors[g] ?? "#8E8E93") ?? .gray).frame(width: 8, height: 8)
-                                Text(g)
+                                Text(g.replacingOccurrences(of: "/", with: " / "))
                                 Spacer()
                                 if g == m.session.group { Image(systemName: "checkmark").foregroundStyle(UI.accent) }
                             }
@@ -700,7 +781,8 @@ private struct GroupPickerPopover: View {
         let v = g.trimmingCharacters(in: .whitespaces)
         guard !v.isEmpty else { return }
         // existující skupinu použij v původním zápisu (bez duplicit HOME / home)
-        m.session.group = groups.first { $0.caseInsensitiveCompare(v) == .orderedSame } ?? v
+        let norm = AppStore.normPath(v)
+        m.session.group = groups.first { $0.caseInsensitiveCompare(norm) == .orderedSame } ?? norm
         m.showGroups = false
     }
 }

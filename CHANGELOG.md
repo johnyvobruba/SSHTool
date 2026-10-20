@@ -290,3 +290,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 
 - Oprava horní části okna: zpět tlačítka okna (zavřít / minimalizovat / celá obrazovka) a bez velké mezery nad záložkami. Levý panel už nepoužívá systémový NavigationSplitView (v novém macOS SDK si vyhrazoval místo pro toolbar), ale vlastní rozložení; okno se nastavuje přímo přes AppKit.
 - Šířka levého panelu jde měnit tažením za okraj (pamatuje se), dvojklik na okraj = výchozí šířka.
+
+## 0.25.0
+
+- **Stromová struktura složek** v levém panelu: složky ve složkách (např. `ANECT / Praha / DC1`), libovolná hloubka, počty serverů včetně podsložek.
+- Pravým tlačítkem na složku: Nový server v této složce, Nová podsložka, Přejmenovat (přejmenuje celý podstrom), Přesunout do složky / do kořene, Barva (podsložky ji dědí), Smazat prázdnou složku.
+- Přetažení: server na složku = přesun serveru; **složka na složku = přesun celé složky i s obsahem** (nelze do sebe sama ani do vlastní podsložky).
+- Menu „+“ → Nová složka… (podsložky odděl lomítkem, např. `ANECT/Praha`); prázdné složky se pamatují.
+- Editor serveru: výběr složky zobrazuje celé cesty, novou podsložku zadáš jako `A/B`.
+- Kompatibilní s existujícími daty: dosavadní skupiny jsou složky nejvyšší úrovně.

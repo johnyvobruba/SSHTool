@@ -42,9 +42,16 @@ enum GroupPalette {
     }
 
     static func color(for group: String) -> String {
-        if let c = overrides[group] { return c }
+        // ruční barva složky, jinak nejbližší nadřazené; automatická podle složky nejvyšší úrovně
+        var p = group
+        while true {
+            if let c = overrides[p] { return c }
+            guard let slash = p.lastIndex(of: "/") else { break }
+            p = String(p[..<slash])
+        }
+        let top = group.split(separator: "/").first.map(String.init) ?? group
         var h: UInt32 = 5381                                     // djb2 – stabilní mezi spuštěními
-        for b in group.utf8 { h = (h &* 33) &+ UInt32(b) }
+        for b in top.utf8 { h = (h &* 33) &+ UInt32(b) }
         return colors[Int(h % UInt32(colors.count))]
     }
 }
