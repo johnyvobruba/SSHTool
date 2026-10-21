@@ -74,8 +74,39 @@ enum FreeRDP {
     /// Dynamický režim posílá velikost v bodech – tam by vyšší měřítko vše ještě zvětšilo.
     @MainActor static func scale(for s: SSHSession) -> Int? {
         if s.rdpScale > 0 { return s.rdpScale == 100 ? nil : s.rdpScale }
-        guard s.rdpSize == "fullscreen", (NSScreen.main?.backingScaleFactor ?? 1) >= 2 else { return nil }
+        guard s.rdpSize == "fullscreen", (targetScreen(s)?.backingScaleFactor ?? 1) >= 2 else { return nil }
         return 150
+    }
+
+    // MARK: Monitor pro celou obrazovku
+
+    /// Obrazovka, na které se má relace otevřít: zvolená podle názvu, jinak ta s oknem SSHTool.
+    @MainActor static func targetScreen(_ s: SSHSession) -> NSScreen? {
+        if !s.rdpMonitor.isEmpty, let sc = NSScreen.screens.first(where: { $0.localizedName == s.rdpMonitor }) { return sc }
+        return NSApp.keyWindow?.screen ?? NSApp.mainWindow?.screen ?? NSScreen.main
+    }
+
+    /// Monitory podle FreeRDP (`/list:monitor`): ID → název. Řádky typu „ * [1] [Built-in Retina Display] 1470x956 +0+0“.
+    static func listMonitors(bin: String) -> [(id: Int, name: String)] {
+        let p = Process(), out = Pipe()
+        p.executableURL = URL(fileURLWithPath: bin)
+        p.arguments = ["/list:monitor"]
+        p.standardOutput = out; p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return [] }
+        let deadline = Date().addingTimeInterval(3)
+        while p.isRunning && Date() < deadline { usleep(20_000) }
+        if p.isRunning { p.terminate(); return [] }
+        let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        guard let re = try? NSRegularExpression(pattern: #"\[(\d+)\]\s+\[([^\]]+)\]"#) else { return [] }
+        var res: [(Int, String)] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let l = String(line)
+            guard let m = re.firstMatch(in: l, range: NSRange(l.startIndex..., in: l)),
+                  let r1 = Range(m.range(at: 1), in: l), let r2 = Range(m.range(at: 2), in: l),
+                  let id = Int(l[r1]) else { continue }
+            res.append((id, String(l[r2])))
+        }
+        return res
     }
 
     /// Argumenty pro FreeRDP (bez hesla).
@@ -93,6 +124,9 @@ enum FreeRDP {
         }
         if let scale = scale(for: s), !s.rdpExtraArgs.contains("/scale-desktop") { a.append("/scale-desktop:\(scale)") }
         if s.rdpMultiMon { a.append("/multimon") }
+        else if s.rdpSize == "fullscreen", let mid = s.rdpMonitorID, !s.rdpExtraArgs.contains("/monitors") {
+            a.append("/monitors:\(mid)")
+        }
         // levý ⌘ (RDP scancode LWin 0x15B) → levý Ctrl (0x1D); ruční /kbd v Dalších argumentech má přednost
         if s.rdpMacKeys, !s.rdpExtraArgs.contains("/kbd:") { a.append("/kbd:remap:0x15b=0x1d") }
         a.append(s.rdpClipboard ? "+clipboard" : "-clipboard")
@@ -150,9 +184,9 @@ final class RDPLauncher: ObservableObject {
         launch(t)
     }
 
-    func launch(_ s: SSHSession) {
+    func launch(_ s: SSHSession, confirmed: Bool = false) {
         if s.rdpAskFolder { launchWithFolderPicker(s); return }
-        if let p = running[s.id], p.isRunning {
+        if !confirmed, let p = running[s.id], p.isRunning {
             let a = NSAlert()
             a.messageText = "RDP relace „\(s.name)“ už běží"
             a.informativeText = "Okno FreeRDP najdeš v Docku / ⌘Tab. Otevřít další relaci?"
@@ -176,7 +210,7 @@ final class RDPLauncher: ObservableObject {
                 return
             }
         }
-        if s.envTag == "prod" {
+        if s.envTag == "prod", !confirmed {
             let a = NSAlert(); a.alertStyle = .warning
             a.messageText = "Připojit se k produkčnímu serveru \(s.name)?"
             a.informativeText = "\(s.host) je označený jako PROD."
@@ -186,13 +220,20 @@ final class RDPLauncher: ObservableObject {
         Self.showHotkeysOnce()
         let stored = s.hasStoredPassword
         let sid = s.id.uuidString, needAuth = s.requireUserAuth, name = s.name
+        // celá obrazovka: na kterém monitoru (název z macOS → ID podle FreeRDP)
+        let wantFull = s.rdpSize == "fullscreen" && !s.rdpMultiMon
+        let screenName = wantFull ? FreeRDP.targetScreen(s)?.localizedName : nil
         Task.detached {
             var password: String?
             if stored {
                 if needAuth, !UserAuth.authenticate(reason: "použít uložené heslo pro RDP „\(name)“") { return }
                 password = KeychainStore.password(for: sid)
             }
-            await MainActor.run { self.start(bin: bin, session: s, password: password) }
+            var t = s
+            if let screenName {
+                t.rdpMonitorID = FreeRDP.listMonitors(bin: bin).first(where: { $0.name == screenName })?.id
+            }
+            await MainActor.run { self.start(bin: bin, session: t, password: password) }
         }
     }
 
@@ -308,6 +349,7 @@ final class RDPLauncher: ObservableObject {
             sink.close("\n===== konec · kód \(code) · \(Int(Date().timeIntervalSince(started))) s\n")
             DispatchQueue.main.async {
                 if self.running[id] === proc { self.running[id] = nil }
+                self.stopWatch(id, pid: proc.processIdentifier)
                 let byUser = self.stopping.remove(id) != nil
                 self.onChange?()
                 // relace proběhla (přihlášení) nebo ji ukončil uživatel → zavření okna není chyba
@@ -348,6 +390,10 @@ final class RDPLauncher: ObservableObject {
         try? inPipe.fileHandleForWriting.close()
         running[s.id] = p
         onChange?()
+        if s.rdpSize == "fullscreen", !s.rdpMultiMon, s.rdpAutoMonitor {
+            currentScreen[s.id] = nil
+            startWatch(s, pid: p.processIdentifier, ready: loggedOn)
+        }
         if tuned {
             // relace v upraveném režimu vydržela → nastavení uložit do serveru
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak p] in
@@ -376,6 +422,89 @@ final class RDPLauncher: ObservableObject {
         a.messageText = "Ovládání RDP relace"
         a.informativeText = hotkeysText
         a.runModal()
+    }
+
+    /// Odpojí běžící relaci a připojí ji znovu na zvoleném monitoru (Windows relace zůstává, okna se neztratí).
+    /// monitor != nil → celá obrazovka na tomto monitoru; nil → stejné rozložení jako dosud.
+    func reconnect(_ s: SSHSession, monitor: String?) {
+        var t = s
+        if let monitor { t.rdpMonitor = monitor; t.rdpSize = "fullscreen" }
+        t.rdpAskFolder = false
+        t.rdpMonitorID = nil
+        stopWatch(s.id)
+        guard let p = running[s.id] else { launch(t); return }
+        stopping.insert(s.id)
+        p.terminate()
+        // již potvrzeno (PROD) – bez dalších dotazů
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.launch(t, confirmed: true) }
+    }
+
+    /// Změna měřítka (DPI) ve Windows – uloží se k serveru a běžící relace se přepojí.
+    func setScale(_ s: SSHSession, _ value: Int) {
+        if let store = AppStore.shared, let i = store.sessions.firstIndex(where: { $0.id == s.id }) {
+            store.sessions[i].rdpScale = value
+        }
+        var t = s
+        t.rdpScale = value
+        guard isRunning(s.id) else { return }
+        reconnect(t, monitor: t.rdpSize == "fullscreen" ? currentScreen[s.id] : nil)
+    }
+
+    // MARK: Hlídání monitoru (celá obrazovka)
+    // FreeRDP (SDL) po přesunu celé obrazovky na jiný monitor nepošle nové rozlišení → plocha se ořízne.
+    // SSHTool proto sleduje, na kterém monitoru je okno relace (CGWindowList – pozice oken jiných aplikací
+    // nevyžaduje žádné oprávnění), a když okno 2 s zůstane na jiném monitoru, relaci na něm přepojí.
+
+    private struct Watch { let timer: Timer; let pid: Int32; let ready: Box<Bool> }
+    private var watches: [UUID: Watch] = [:]
+    private var currentScreen: [UUID: String] = [:]
+    private var pendingScreen: [UUID: (name: String, ticks: Int)] = [:]
+
+    /// ready = přihlášení do Windows proběhlo (do té doby je vidět jen připojovací dialog – ten se nehlídá).
+    private func startWatch(_ s: SSHSession, pid: Int32, ready: Box<Bool>) {
+        stopWatch(s.id)
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            DispatchQueue.main.async { self.tick(s, pid: pid) }
+        }
+        watches[s.id] = Watch(timer: timer, pid: pid, ready: ready)
+    }
+
+    private func stopWatch(_ id: UUID, pid: Int32? = nil) {
+        guard let w = watches[id], pid == nil || w.pid == pid else { return }
+        w.timer.invalidate()
+        watches[id] = nil
+        pendingScreen[id] = nil
+    }
+
+    /// Název monitoru, na kterém je největší okno daného procesu (nil = okno teď není vidět, např. jiný Space).
+    static func screenOfWindow(pid: Int32) -> String? {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return nil }
+        var best: CGRect = .zero
+        for w in info {
+            guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
+                  (w[kCGWindowLayer as String] as? Int) == 0,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b as CFDictionary) else { continue }
+            if r.width * r.height > best.width * best.height { best = r }
+        }
+        guard best.width > 200, let primary = NSScreen.screens.first else { return nil }
+        // CG souřadnice (počátek vlevo nahoře) → AppKit (vlevo dole)
+        let center = NSPoint(x: best.midX, y: primary.frame.maxY - best.midY)
+        return NSScreen.screens.first(where: { $0.frame.contains(center) })?.localizedName
+    }
+
+    private func tick(_ s: SSHSession, pid: Int32) {
+        guard let w = watches[s.id], w.pid == pid, w.ready.value else { return }
+        guard let name = Self.screenOfWindow(pid: pid) else { return }
+        guard let current = currentScreen[s.id] else { currentScreen[s.id] = name; return }
+        if name == current { pendingScreen[s.id] = nil; return }
+        let n = (pendingScreen[s.id]?.name == name ? pendingScreen[s.id]!.ticks : 0) + 1
+        pendingScreen[s.id] = (name, n)
+        if n >= 2 {                                   // okno je na jiném monitoru ≥ 2 s
+            currentScreen[s.id] = name
+            reconnect(s, monitor: name)
+        }
     }
 
     func disconnect(_ id: UUID) {

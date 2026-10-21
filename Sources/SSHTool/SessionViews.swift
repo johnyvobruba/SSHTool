@@ -312,6 +312,20 @@ struct ServerContextMenu: View {
     @ViewBuilder private var rdpMenu: some View {
         Button("Připojit (RDP)") { RDPLauncher.shared.launch(session) }
         Button("Připojit se sdílenou složkou…") { RDPLauncher.shared.launchWithFolderPicker(session) }
+        if NSScreen.screens.count > 1 {
+            Menu(RDPLauncher.shared.isRunning(session.id) ? "Přepojit na monitor" : "Připojit na monitoru") {
+                ForEach(NSScreen.screens.map(\.localizedName), id: \.self) { name in
+                    Button(name) { RDPLauncher.shared.reconnect(session, monitor: name) }
+                }
+            }
+        }
+        Menu(RDPLauncher.shared.isRunning(session.id) ? "Měřítko ve Windows (přepojí)" : "Měřítko ve Windows") {
+            ForEach([0, 100, 125, 150, 175, 200], id: \.self) { v in
+                Button((session.rdpScale == v ? "✓ " : "") + (v == 0 ? "Automaticky" : "\(v) %")) {
+                    RDPLauncher.shared.setScale(session, v)
+                }
+            }
+        }
         if RDPLauncher.shared.isRunning(session.id) {
             Button("Odpojit") { RDPLauncher.shared.disconnect(session.id) }
         }
@@ -656,6 +670,20 @@ struct SessionEditor: View {
             }
             Text("Velikost písma a ovládacích prvků ve Windows. Automaticky: celá obrazovka na Retině 150 %, jinak 100 %.")
                 .font(.caption).foregroundStyle(.secondary)
+            if m.session.rdpSize == "fullscreen" && !m.session.rdpMultiMon {
+                Picker("Monitor", selection: $m.session.rdpMonitor) {
+                    Text("Kde je okno SSHTool").tag("")
+                    ForEach(NSScreen.screens.map(\.localizedName), id: \.self) { Text($0).tag($0) }
+                    if !m.session.rdpMonitor.isEmpty && !NSScreen.screens.contains(where: { $0.localizedName == m.session.rdpMonitor }) {
+                        Text("\(m.session.rdpMonitor) (nepřipojený)").tag(m.session.rdpMonitor)
+                    }
+                }
+                Toggle("Po přesunu na jiný monitor automaticky přepojit", isOn: $m.session.rdpAutoMonitor)
+                Text(m.session.rdpAutoMonitor
+                     ? "Přesun: pravý ⇧ + Enter (okno) → přetáhnout na monitor → asi za 2 s se relace přepojí na celou obrazovku v jeho rozlišení. Windows relace i aplikace zůstanou."
+                     : "Celá obrazovka převezme rozlišení tohoto monitoru. Přesun na jiný monitor ji ořízne – pravé tlačítko → „Přepojit na monitor“.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)
             Toggle("Levý ⌘ jako Ctrl (⌘C, ⌘V, ⌘A… ve Windows)", isOn: $m.session.rdpMacKeys)

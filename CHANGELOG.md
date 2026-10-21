@@ -395,3 +395,19 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   Automaticky: celá obrazovka na Retině 150 % (ostré a čitelné místo drobného), jinak beze změny.
   Ruční `/scale-desktop` v Dalších argumentech má přednost.
 - Import serverů (JSON) zná pole `rdpScale`.
+
+## 0.26.10
+
+- RDP: **výběr monitoru pro celou obrazovku** – relace se otevře na zvoleném monitoru v jeho rozlišení
+  (výchozí: monitor, kde je okno SSHTool). Název z macOS se při připojení převede na ID podle
+  `sdl-freerdp /list:monitor` → `/monitors:<id>`.
+- RDP: pravé tlačítko na serveru → „Připojit na monitoru ▸ / Přepojit na monitor ▸“ – běžící relaci odpojí
+  a připojí na jiném monitoru (Windows relace i otevřené aplikace zůstanou).
+- Automatické měřítko se řídí cílovým monitorem (Retina 150 %, běžný monitor 100 %).
+- RDP: **automatické přepojení po přesunu na jiný monitor** (celá obrazovka) – SSHTool sleduje, na kterém monitoru
+  je okno relace (CGWindowList, bez zvláštních oprávnění); když na jiném zůstane ≥ 2 s, relaci přepojí na celou
+  obrazovku toho monitoru (rozlišení i měřítko). Přepínač v editoru, výchozí zapnuto.
+- RDP: **změna měřítka za běhu** – pravé tlačítko na serveru → „Měřítko ve Windows ▸“; uloží se k serveru
+  a běžící relace se přepojí (FreeRDP neumí měřítko změnit bez přepojení).
+- Automatické přepojení se znovu neptá na potvrzení PROD (už bylo potvrzeno).
+- Import serverů (JSON) zná pole `rdpMonitor`, `rdpAutoMonitor`.
