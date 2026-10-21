@@ -74,6 +74,8 @@ enum FreeRDP {
         if !s.rdpGfx { a.append("-gfx") }
         if !s.rdpUDP { a.append("-multitransport") }
         if s.rdpDebugLog { a.append("/log-level:DEBUG") }
+        // INFO jen pro client.common – zpráva o přihlášení (Logon Info) = relace se úspěšně spustila
+        else { a.append("/log-filters:com.freerdp.client.common:INFO") }
         a += s.rdpExtraArgs.split(separator: " ").map(String.init)
         return a
     }
@@ -88,6 +90,10 @@ enum FreeRDP {
 final class RDPLauncher: ObservableObject {
     static let shared = RDPLauncher()
     @Published private(set) var running: [UUID: Process] = [:]
+    /// Relace ukončené uživatelem z SSHTool (⏏ / Odpojit) – po ukončení se nehlásí chyba.
+    private var stopping: Set<UUID> = []
+    /// Značky ve výstupu FreeRDP, že proběhlo přihlášení do Windows.
+    static let logonMarkers = ["save_session_info", "Logon Extended Info", "LogonId"]
     var onChange: (() -> Void)?
 
     func isRunning(_ id: UUID) -> Bool { running[id] != nil }
@@ -205,11 +211,23 @@ final class RDPLauncher: ObservableObject {
                               header: "\n===== \(df.string(from: Date())) · \(tuned ? "kompatibilní pokus" : "připojení") · \(s.name)\n" +
                                       "FreeRDP: \(bin)\nArgumenty: \(shown)\(password == nil ? "" : " /p:********")\n\n",
                               secret: password)
+        let loggedOn = Box<Bool>(false), persisted = Box<Bool>(false)
         errPipe.fileHandleForReading.readabilityHandler = { h in
             let d = h.availableData
             guard !d.isEmpty else { h.readabilityHandler = nil; return }
             let text = String(decoding: d, as: UTF8.self)
             sink.write(text)
+            if !loggedOn.value, RDPLauncher.logonMarkers.contains(where: { text.contains($0) }) {
+                loggedOn.value = true
+                if tuned {
+                    // přihlášení v upraveném režimu prošlo → uložit nastavení hned (ne až po 30 s)
+                    DispatchQueue.main.async {
+                        guard !persisted.value else { return }
+                        persisted.value = true
+                        self.persist(s)
+                    }
+                }
+            }
             errBox.mutate {
                 $0 += text
                 if $0.count > 64000 { $0 = String($0.suffix(48000)) }
@@ -221,9 +239,13 @@ final class RDPLauncher: ObservableObject {
             sink.close("\n===== konec · kód \(code) · \(Int(Date().timeIntervalSince(started))) s\n")
             DispatchQueue.main.async {
                 if self.running[id] === proc { self.running[id] = nil }
+                let byUser = self.stopping.remove(id) != nil
                 self.onChange?()
+                // relace proběhla (přihlášení) nebo ji ukončil uživatel → zavření okna není chyba
+                if loggedOn.value || byUser { return }
                 // rychlé ukončení s chybou = chyba připojení / přihlášení
                 guard code != 0, Date().timeIntervalSince(started) < 90 else { return }
+                if errBox.value.contains("CONNECT_CANCELLED") { return }      // zrušeno uživatelem (okno/dialog)
                 let log = errBox.value
                 if s.rdpAutoDetect, RDPLauncher.isRetryable(log), let step = RDPLauncher.nextStep(after: s) {
                     if step.needsConsent, !self.confirmTLS(s) { return }
@@ -260,7 +282,8 @@ final class RDPLauncher: ObservableObject {
         if tuned {
             // relace v upraveném režimu vydržela → nastavení uložit do serveru
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak p] in
-                guard let p, p.isRunning else { return }
+                guard let p, p.isRunning, !persisted.value else { return }
+                persisted.value = true
                 self.persist(s)
             }
         }
@@ -287,7 +310,9 @@ final class RDPLauncher: ObservableObject {
     }
 
     func disconnect(_ id: UUID) {
-        running[id]?.terminate()
+        guard let p = running[id] else { return }
+        stopping.insert(id)
+        p.terminate()
     }
 }
 

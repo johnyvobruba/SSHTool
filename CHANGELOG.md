@@ -359,3 +359,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Servery, kterým automatická detekce uložila TLS, lze vrátit na NLA tlačítkem „Obnovit výchozí a detekovat znovu“.
 - Okno RDP relace má v Docku a v přepínači ⌘Tab ikonu a název „SSHTool RDP“ – FreeRDP je nově přibalený
   jako vnořená aplikace `Contents/Helpers/SSHTool-RDP.app` (knihovny v jejím `Contents/Frameworks`).
+
+## 0.26.6
+
+- RDP: zavření okna relace (nebo ⏏ Odpojit) už nehlásí chybu `ERRCONNECT_CONNECT_CANCELLED`.
+- RDP: úspěšná relace se pozná podle přihlášení do Windows (Logon Info), ne podle délky běhu –
+  automaticky nalezené kompatibilní nastavení se uloží hned po přihlášení, i když relaci zavřeš do 30 s.
+- FreeRDP dostává `/log-filters:com.freerdp.client.common:INFO` (jen zpráva o přihlášení, log se tím téměř nezvětší).
