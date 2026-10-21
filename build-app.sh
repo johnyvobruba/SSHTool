@@ -8,14 +8,14 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.25.0}"
+VERSION="${VERSION_OVERRIDE:-0.25.1}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
 if [[ -z "$UPDATE_REPO" ]] && command -v git >/dev/null && git rev-parse --git-dir >/dev/null 2>&1; then
   UPDATE_REPO="$(git config --get remote.origin.url 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##' || true)"
 fi
-[[ "$UPDATE_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || UPDATE_REPO=""
+[[ "$UPDATE_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || UPDATE_REPO="johnyvobruba/SSHTool"   # výchozí oficiální zdroj
 UPDATE_PUBKEY=""
 [[ -f update-public-key.txt ]] && UPDATE_PUBKEY="$(tr -d ' \n\r' < update-public-key.txt)"
 APP="build/${APP_NAME}.app"

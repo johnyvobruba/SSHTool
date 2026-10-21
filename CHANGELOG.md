@@ -299,3 +299,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Menu „+“ → Nová složka… (podsložky odděl lomítkem, např. `ANECT/Praha`); prázdné složky se pamatují.
 - Editor serveru: výběr složky zobrazuje celé cesty, novou podsložku zadáš jako `A/B`.
 - Kompatibilní s existujícími daty: dosavadní skupiny jsou složky nejvyšší úrovně.
+
+## 0.25.1
+
+- Aktualizace fungují i u aplikace sestavené ze ZIPu bez gitu: výchozí zdroj `johnyvobruba/SSHTool` a veřejný klíč podpisu jsou přímo v aplikaci.

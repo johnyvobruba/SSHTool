@@ -23,14 +23,21 @@ final class Updater: ObservableObject {
         struct Asset: Decodable { let name: String; let browser_download_url: String; let size: Int }
     }
 
+    /// Oficiální zdroj aktualizací – použije se, když build nemá repo v Info.plist (např. sestavení ze ZIPu bez gitu).
+    static let defaultRepo = "johnyvobruba/SSHTool"
+    /// Veřejný klíč podpisu vydání (není tajný; soukromý klíč je jen u autora a v GitHub secretu).
+    static let defaultPublicKey = "9aw/YZQh77i5LSRsABx7OLYvPBoOoVyxyUipZdGDr8M="
+
     var repo: String? {
         let r = Bundle.main.object(forInfoDictionaryKey: "SSHToolUpdateRepo") as? String ?? ""
-        return r.range(of: #"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil ? r : nil
+        let ok = r.range(of: #"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil
+        return ok ? r : Self.defaultRepo
     }
 
     private var publicKey: Curve25519.Signing.PublicKey? {
-        guard let b64 = Bundle.main.object(forInfoDictionaryKey: "SSHToolUpdatePublicKey") as? String,
-              let raw = Data(base64Encoded: b64) else { return nil }
+        let plist = (Bundle.main.object(forInfoDictionaryKey: "SSHToolUpdatePublicKey") as? String) ?? ""
+        let b64 = plist.isEmpty ? Self.defaultPublicKey : plist
+        guard let raw = Data(base64Encoded: b64) else { return nil }
         return try? Curve25519.Signing.PublicKey(rawRepresentation: raw)
     }
 
