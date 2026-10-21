@@ -905,6 +905,7 @@ struct SettingsServersPane: View {
         ("rdpSecurity", "ne", "RDP: \"\" (auto), nla, tls, rdp"),
         ("rdpBpp", "ne", "RDP: 0 (výchozí), 24, 16"),
         ("rdpGfx, rdpUDP", "ne", "RDP: true/false – grafický kanál GFX, UDP multitransport"),
+        ("rdpAutoDetect", "ne", "RDP: true/false – automaticky najít kompatibilní režim (výchozí true)"),
     ]
 
     var body: some View {

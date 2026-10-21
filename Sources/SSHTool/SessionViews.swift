@@ -668,8 +668,16 @@ struct SessionEditor: View {
             }
             Toggle("Grafický kanál GFX (H.264)", isOn: $m.session.rdpGfx)
             Toggle("UDP multitransport", isOn: $m.session.rdpUDP)
-            Text("Když se okno RDP otevře a hned zavře (TRANSPORT_FAILED), zkus vypnout GFX a UDP, nastavit 24 bit a případně zabezpečení TLS.")
+            Toggle("Automaticky najít kompatibilní režim", isOn: $m.session.rdpAutoDetect)
+            Text("Když se relace hned po otevření ukončí (TRANSPORT_FAILED), SSHTool to zkusí znovu bez GFX a UDP s 24 bity a funkční nastavení uloží sem. Přechod na TLS bez NLA vždy potvrzuješ ty. Výslovně zvolené zabezpečení se nemění.")
                 .font(.caption).foregroundStyle(.secondary)
+            if !m.session.rdpGfx || !m.session.rdpUDP || m.session.rdpBpp != 0 || !m.session.rdpSecurity.isEmpty {
+                Button("Obnovit výchozí a detekovat znovu") {
+                    m.session.rdpGfx = true; m.session.rdpUDP = true
+                    m.session.rdpBpp = 0; m.session.rdpSecurity = ""
+                    m.session.rdpAutoDetect = true
+                }
+            }
             LabeledContent("Další argumenty FreeRDP") {
                 TextField("", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
                     .labelsHidden().font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)

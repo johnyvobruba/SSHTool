@@ -54,6 +54,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var rdpBpp = 0                      // 0 = výchozí (32), 24, 16
     var rdpGfx = true                   // grafický kanál GFX (H.264/AVC, progressive)
     var rdpUDP = true                   // UDP multitransport
+    var rdpAutoDetect = true            // při selhání zkusit kompatibilní režim a uložit ho
 
     var isRDP: Bool { proto == "rdp" }
 
@@ -71,7 +72,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
              proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpCertPolicy, rdpExtraArgs,
-             rdpSecurity, rdpBpp, rdpGfx, rdpUDP
+             rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect
     }
 
     var usesStoredPassword: Bool { auth == .password && hasStoredPassword }
@@ -594,6 +595,7 @@ extension SSHSession {
         rdpBpp = [32, 24, 16].contains(bpp) ? bpp : 0
         rdpGfx = try c.decodeIfPresent(Bool.self, forKey: .rdpGfx) ?? true
         rdpUDP = try c.decodeIfPresent(Bool.self, forKey: .rdpUDP) ?? true
+        rdpAutoDetect = try c.decodeIfPresent(Bool.self, forKey: .rdpAutoDetect) ?? true
     }
 }
 

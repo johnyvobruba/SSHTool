@@ -325,5 +325,19 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Barevná hloubka: výchozí / 24 / 16 bit (`/bpp:`).
   - Přepínače Grafický kanál GFX (`-gfx`) a UDP multitransport (`-multitransport`).
   - Řeší okno RDP, které se otevře a hned zavře (TRANSPORT_FAILED) – bez ručních argumentů.
+- RDP: automatická detekce kompatibilního režimu (výchozí zapnuto). Když se relace hned po otevření ukončí
+  chybou spojení/aktivace (TRANSPORT_FAILED), SSHTool ji zkusí znovu bez GFX a UDP s 24 bity; když ani to nestačí,
+  nabídne TLS místo NLA – **jen po potvrzení** (ochrana proti downgrade útoku). Funkční nastavení se uloží do serveru.
+  Neopakuje se při chybném hesle, zamčeném účtu, nedostupném hostu ani zrušení. Tlačítko „Obnovit výchozí a detekovat znovu“.
 - Popisky polí „Další argumenty“ už nejsou neproporcionálním písmem.
-- Import serverů (JSON) zná nová pole `rdpSecurity`, `rdpBpp`, `rdpGfx`, `rdpUDP`.
+- Import serverů (JSON) zná nová pole `rdpSecurity`, `rdpBpp`, `rdpGfx`, `rdpUDP`, `rdpAutoDetect`.
+
+## 0.26.3
+
+- RDP: automatická detekce kompatibilního režimu (výchozí zapnuto). Když se relace hned po otevření ukončí
+  chybou spojení/aktivace (TRANSPORT_FAILED), SSHTool ji zkusí znovu bez GFX a UDP s 24 bity; když ani to nestačí,
+  nabídne TLS místo NLA – **jen po potvrzení** (ochrana proti downgrade útoku). Funkční nastavení se uloží do serveru.
+- Neopakuje se při chybném hesle, zamčeném účtu, nedostupném hostu ani zrušení.
+- Výslovně zvolené zabezpečení (NLA/TLS/RDP) se nikdy nemění.
+- Editor RDP: přepínač „Automaticky najít kompatibilní režim“ a tlačítko „Obnovit výchozí a detekovat znovu“.
+- Import serverů (JSON) zná pole `rdpAutoDetect`.
