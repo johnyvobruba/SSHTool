@@ -32,6 +32,7 @@ struct AppSettings: Codable, Equatable {
     var monitorAuto = false               // monitor CPU/RAM/disk spouštět automaticky po přihlášení
     var autoUpdateCheck = true            // kontrolovat nové verze na GitHubu při spuštění
     var folders: [String] = []            // složky (i prázdné) – cesty „A/B/C“
+    var freerdpPath = ""                  // "" = automaticky (Homebrew), jinak cesta ke klientovi FreeRDP
 
     /// Volitelná písma terminálu – v nastavení se nabídnou jen nainstalovaná.
     static let fontChoices: [(name: String, label: String)] = [
@@ -49,7 +50,7 @@ struct AppSettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case copyOnSelect, rightClickPaste, logEnabled, logDirectory, logPlainText, scrollback, fontSize, serialBaud, collapsedGroups,
              fontName, lineSpacing, highlightEnabled, sidebarComfortable, latencyEnabled,
-             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders
+             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders, freerdpPath
     }
 
     var logDirectoryURL: URL {
@@ -88,6 +89,7 @@ extension AppSettings {
         monitorAuto = try c.decodeIfPresent(Bool.self, forKey: .monitorAuto) ?? d.monitorAuto
         autoUpdateCheck = try c.decodeIfPresent(Bool.self, forKey: .autoUpdateCheck) ?? d.autoUpdateCheck
         folders = try c.decodeIfPresent([String].self, forKey: .folders) ?? d.folders
+        freerdpPath = try c.decodeIfPresent(String.self, forKey: .freerdpPath) ?? d.freerdpPath
     }
 }
 

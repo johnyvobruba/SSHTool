@@ -40,6 +40,18 @@ struct SSHSession: Codable, Identifiable, Hashable {
     /// Politika ověření klíče serveru: "" = výchozí (ssh config), "ask", "yes" (striktní), "accept-new".
     /// Hodnota „no“ (ignorovat) se záměrně nenabízí.
     var hostKeyPolicy = ""
+    /// Protokol: "ssh" (výchozí) nebo "rdp" (FreeRDP v samostatném okně).
+    var proto = "ssh"
+    var rdpDomain = ""
+    var rdpGateway = ""                 // RD Gateway (user@gw nebo gw)
+    var rdpSize = "dynamic"             // dynamic | fullscreen | 1920x1080 …
+    var rdpMultiMon = false
+    var rdpClipboard = true
+    var rdpShareHome = false            // přesměrování domovské složky Macu do RDP relace
+    var rdpCertPolicy = ""              // "" = zeptat se, "tofu" = důvěřovat při prvním připojení
+    var rdpExtraArgs = ""
+
+    var isRDP: Bool { proto == "rdp" }
 
     var envTag: String { environment.isEmpty && production ? "prod" : environment }
 
@@ -53,7 +65,8 @@ struct SSHSession: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy
+        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
+             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpCertPolicy, rdpExtraArgs
     }
 
     var usesStoredPassword: Bool { auth == .password && hasStoredPassword }
@@ -561,6 +574,15 @@ extension SSHSession {
         keepAlive = try c.decodeIfPresent(Int.self, forKey: .keepAlive) ?? 0
         connectTimeout = try c.decodeIfPresent(Int.self, forKey: .connectTimeout) ?? 0
         hostKeyPolicy = try c.decodeIfPresent(String.self, forKey: .hostKeyPolicy) ?? ""
+        proto = (try c.decodeIfPresent(String.self, forKey: .proto)) == "rdp" ? "rdp" : "ssh"
+        rdpDomain = try c.decodeIfPresent(String.self, forKey: .rdpDomain) ?? ""
+        rdpGateway = try c.decodeIfPresent(String.self, forKey: .rdpGateway) ?? ""
+        rdpSize = try c.decodeIfPresent(String.self, forKey: .rdpSize) ?? "dynamic"
+        rdpMultiMon = try c.decodeIfPresent(Bool.self, forKey: .rdpMultiMon) ?? false
+        rdpClipboard = try c.decodeIfPresent(Bool.self, forKey: .rdpClipboard) ?? true
+        rdpShareHome = try c.decodeIfPresent(Bool.self, forKey: .rdpShareHome) ?? false
+        rdpCertPolicy = (try c.decodeIfPresent(String.self, forKey: .rdpCertPolicy)) == "tofu" ? "tofu" : ""
+        rdpExtraArgs = try c.decodeIfPresent(String.self, forKey: .rdpExtraArgs) ?? ""
     }
 }
 

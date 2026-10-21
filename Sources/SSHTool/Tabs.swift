@@ -236,6 +236,7 @@ final class TabManager: ObservableObject {
 
     /// Stav session pro levý panel (bere nejlepší stav ze záložek SSH/SFTP této session).
     func state(for sessionID: UUID) -> ConnState? {
+        if RDPLauncher.shared.isRunning(sessionID) { return .connected }
         let ts = tabs.filter { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .sftp) }
         if ts.contains(where: { $0.state == .connected }) { return .connected }
         if ts.contains(where: { $0.state == .connecting }) { return .connecting }
@@ -380,6 +381,7 @@ final class TabManager: ObservableObject {
     }
 
     func open(_ s: SSHSession, kind: TabKind = .ssh) {
+        if s.isRDP { RDPLauncher.shared.launch(s); return }      // RDP = samostatné okno FreeRDP
         insert(TerminalTab(session: s, kind: kind))
     }
 
@@ -450,11 +452,13 @@ final class TabManager: ObservableObject {
 
     /// Dvojklik / „Připojit“: otevřená relace → přepnout na ni, jinak nová záložka.
     func openOrFocus(_ s: SSHSession) {
+        if s.isRDP { RDPLauncher.shared.launch(s); return }
         if let t = liveTab(for: s.id) { selectedID = t.id } else { open(s) }
     }
 
     /// Nová relace jako další panel vedle aktivní záložky.
     func openInSplit(_ s: SSHSession, _ axis: SplitAxis = .vertical) {
+        if s.isRDP { RDPLauncher.shared.launch(s); return }
         guard let cur = selectedID else { open(s); return }
         open(s)
         guard let new = selectedID, new != cur else { return }
@@ -610,6 +614,8 @@ struct MainView: View {
             ZoomGesture.shared.install()
             serial.start()
             Updater.shared.checkOnLaunch()
+            let t = tabs
+            RDPLauncher.shared.onChange = { [weak t] in t?.objectWillChange.send() }   // tečka stavu RDP v levém panelu
         }
     }
 }

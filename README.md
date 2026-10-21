@@ -10,6 +10,7 @@ Inspirovaný Tabby, MobaXterm a Termius – ale rychlý, nativní a s důrazem n
 | Oblast | Co umí |
 |---|---|
 | **Servery** | Skupiny s barvami, oblíbené, hledání, štítky prostředí PROD / STAGE / TEST / DEV, přesun mezi skupinami tažením, import / export JSON (bez hesel), vzor JSON pro kolegy |
+| **RDP** | Windows servery přes FreeRDP 3 v samostatném okně, heslo z Klíčenky přes stdin, gateway, více monitorů, schránka (`brew install freerdp`) |
 | **Přihlášení** | SSH agent / `~/.ssh/config`, Bitwarden SSH agent, soukromý klíč (passphrase v Klíčence), heslo v Klíčence macOS s Touch ID, interaktivní (OTP), jump host |
 | **Terminál** | Záložky, rozdělení až na 4 panely, broadcast vstupu s potvrzením, režim soustředění, 6 barevných profilů, vyhledávání, scrollback až 100 000 řádků, ⌥ znaky pro CZ klávesnici |
 | **Zvýrazňování** | Pravidla (text / regex) ve skupinách, test výrazu, detekce konfliktů, ochrana výkonu |
@@ -22,7 +23,11 @@ Inspirovaný Tabby, MobaXterm a Termius – ale rychlý, nativní a s důrazem n
 
 1. Stáhni nejnovější `SSHTool-x.y.z.zip` z [Releases](../../releases/latest).
 2. Rozbal a přesuň `SSHTool.app` do složky **Aplikace**.
-3. Při prvním spuštění: pravé tlačítko na aplikaci → **Otevřít** (aplikace je podepsaná ad-hoc, není notarizovaná Apple).
+3. Při prvním spuštění macOS hlásí *„SSHTool“ Not Opened* (aplikace není notarizovaná Apple). Klikni **Done** a pak:
+   - **Nastavení systému → Soukromí a zabezpečení** → dole u „SSHTool was blocked…“ **Otevřít přesto** (Open Anyway) → potvrď heslem, **nebo**
+   - v Terminálu: `xattr -dr com.apple.quarantine /Applications/SSHTool.app`
+
+   (macOS 15 Sequoia a novější už neumožňuje obejít kontrolu přes pravé tlačítko → Otevřít.)
 
 Další aktualizace už nabídne aplikace sama (menu **SSHTool → Zkontrolovat aktualizace…**).
 
@@ -32,8 +37,8 @@ Požadavky: macOS 13 Ventura nebo novější (Apple Silicon i Intel při sestave
 
 ```bash
 xcode-select --install        # Command Line Tools (stačí, Xcode není nutný)
-./build-app.sh                # → build/SSHTool.app
-./build-app.sh --install      # → /Applications/SSHTool.app
+bash build-app.sh             # → build/SSHTool.app
+bash build-app.sh --install   # → /Applications/SSHTool.app
 open build/SSHTool.app        # .app je složka – spouštěj přes open
 ```
 

@@ -385,6 +385,16 @@ struct SettingsGeneralPane: View {
                 SKToggle(isOn: $store.settings.latencyEnabled)
                     .help("ICMP ping k serveru – nevytváří SSH spojení ani záznamy v logu sshd. Pokud ICMP blokuje firewall, ukáže se „ICMP –“.")
             }
+            SKRow("FreeRDP (RDP relace)", help: FreeRDP.binary.map { "Nalezeno: \($0)" } ?? "Nenalezeno – brew install freerdp") {
+                HStack(spacing: 6) {
+                    TextField("automaticky", text: $store.settings.freerdpPath).skField(width: 200, mono: true)
+                    Button("Vybrat…") {
+                        let p = NSOpenPanel(); p.title = "Klient FreeRDP (sdl-freerdp / xfreerdp)"
+                        p.directoryURL = URL(fileURLWithPath: "/opt/homebrew/bin")
+                        if p.runModal() == .OK, let u = p.url { store.settings.freerdpPath = u.path }
+                    }.buttonStyle(SKButton())
+                }
+            }
             SKRow("Monitor serveru automaticky", help: "CPU, RAM a disk ve stavovém řádku po přihlášení.") {
                 SKToggle(isOn: $store.settings.monitorAuto)
                     .help("Přes stejné SSH spojení (bez nového přihlášení) čte každých 5 s /proc a df. Jen Linux / Gaia s uživatelem s bash/sh; jinak „Monitor –“. Vypnuto: monitor zapneš kliknutím na „Monitor“ ve stavovém řádku.")
@@ -874,7 +884,7 @@ struct SettingsServersPane: View {
         ("host", "ano", "IP adresa nebo hostname"),
         ("port", "ne", "22"),
         ("user", "ne", "Uživatel, např. admin"),
-        ("group", "ne", "Skupina v levém panelu (výchozí „Default“)"),
+        ("group", "ne", "Složka v levém panelu, podsložky odděl „/“ (výchozí „Default“)"),
         ("colorHex", "ne", "Barva serveru, \"#RRGGBB\""),
         ("environment", "ne", "prod, stage, test, dev nebo \"\""),
         ("auth", "ne", "agent (výchozí), key, password, interactive"),
@@ -888,11 +898,15 @@ struct SettingsServersPane: View {
         ("hostKeyPolicy", "ne", "\"\", ask, yes, accept-new (\"no\" se při importu zahodí)"),
         ("extraArgs", "ne", "Další argumenty ssh, např. -o ServerAliveCountMax=3"),
         ("favorite", "ne", "true/false – Oblíbené"),
+        ("proto", "ne", "ssh (výchozí) nebo rdp"),
+        ("rdpDomain, rdpGateway", "ne", "RDP: doména, RD Gateway"),
+        ("rdpSize", "ne", "RDP: dynamic, fullscreen nebo 1920x1080…"),
+        ("rdpClipboard, rdpMultiMon", "ne", "RDP: true/false"),
     ]
 
     var body: some View {
         SKSection("Servery") {
-            SKRow("Importovat servery (JSON)", help: "Přidá nové servery. Duplicity (název + skupina + host + port) přeskočí. Hesla se nenačítají.", first: true) {
+            SKRow("Importovat servery (JSON)", help: "Přidá nové servery. Duplicity (název + složka + host + port) přeskočí. Hesla se nenačítají.", first: true) {
                 Button("Importovat…") { store.importSessionsPanel() }.buttonStyle(SKButton(kind: .primary))
             }
             SKRow("Exportovat servery", help: "Bez hesel a bez cest ke klíčům – bezpečné ke sdílení s kolegy.") {

@@ -101,7 +101,7 @@ struct SettingsSnippetsPane: View {
                         Button("Pro všechny servery") { add(p, group: "") }
                         if !store.groupNames.isEmpty {
                             Divider()
-                            ForEach(store.groupNames, id: \.self) { g in Button("Jen pro skupinu \(g)") { add(p, group: g) } }
+                            ForEach(store.groupNames, id: \.self) { g in Button("Jen pro složku \(g)") { add(p, group: g) } }
                         }
                         if added {
                             Divider()
@@ -114,7 +114,7 @@ struct SettingsSnippetsPane: View {
         }
         SKSection("Uložené příkazy", subtitle: store.snippets.isEmpty
                   ? "Zatím žádné snippety. Přidej šablonu výše nebo vlastní příkaz."
-                  : "Vkládají se do aktivního terminálu bez spuštění. Skupina omezí snippet na servery dané skupiny.") {
+                  : "Vkládají se do aktivního terminálu bez spuštění. Složka omezí snippet na servery v dané složce.") {
             ForEach(store.snippets.indices, id: \.self) { i in
                 HStack(spacing: 8) {
                     TextField("Název", text: binding(i, \.name)).skField(width: 160)

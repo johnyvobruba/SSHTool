@@ -181,8 +181,8 @@ struct SessionListView: View {
 
     private func groupMenu(_ g: String) -> some View {
         Group {
-            Button("Sbalit všechny skupiny") { store.collapseAll(true) }
-            Button("Rozbalit všechny skupiny") { store.collapseAll(false) }
+            Button("Sbalit všechny složky") { store.collapseAll(true) }
+            Button("Rozbalit všechny složky") { store.collapseAll(false) }
             if g == Self.favoritesKey {
                 Divider()
                 Button("Skrýt sekci Oblíbené") { store.settings.showFavorites = false }
@@ -209,7 +209,7 @@ struct SessionListView: View {
                 if !store.sessions.contains(where: { AppStore.inSubtree($0.group, g) }) {
                     Button("Smazat prázdnou složku") { store.deleteFolder(g) }
                 }
-                Menu("Barva skupiny") {
+                Menu("Barva složky") {
                     Button("Automatická") { store.setGroupColor(g, nil) }
                     Divider()
                     ForEach(GroupPalette.colors, id: \.self) { h in
@@ -231,8 +231,8 @@ struct SessionListView: View {
                     }
                     Button("Rychlé připojení…  ⇧⌘K") { tabs.showQuickConnect = true }
                     Divider()
-                    Button("Sbalit všechny skupiny") { store.collapseAll(true) }
-                    Button("Rozbalit všechny skupiny") { store.collapseAll(false) }
+                    Button("Sbalit všechny složky") { store.collapseAll(true) }
+                    Button("Rozbalit všechny složky") { store.collapseAll(false) }
                     Button(store.settings.showFavorites ? "Skrýt Oblíbené" : "Zobrazit Oblíbené") {
                         store.settings.showFavorites.toggle()
                     }
@@ -306,6 +306,23 @@ struct ServerContextMenu: View {
     }
 
     var body: some View {
+        if session.isRDP { rdpMenu } else { sshMenu }
+    }
+
+    @ViewBuilder private var rdpMenu: some View {
+        Button("Připojit (RDP)") { RDPLauncher.shared.launch(session) }
+        if RDPLauncher.shared.isRunning(session.id) {
+            Button("Odpojit") { RDPLauncher.shared.disconnect(session.id) }
+        }
+        Divider()
+        Button("Upravit server…") { edit() }
+        Button("Duplikovat server") { store.duplicate(session) }
+        Button("Kopírovat IP adresu") { copy(session.host) }
+        Button("Kopírovat příkaz FreeRDP (bez hesla)") { copy(FreeRDP.commandLine(session)) }
+        commonTail
+    }
+
+    @ViewBuilder private var sshMenu: some View {
         let live = tabs.liveTab(for: session.id)
         if let live {
             Button("Přejít na otevřenou relaci") { tabs.selectedID = live.id }
@@ -324,15 +341,19 @@ struct ServerContextMenu: View {
         Button("Duplikovat server") { store.duplicate(session) }
         Button("Kopírovat IP adresu") { copy(session.host) }
         Button("Kopírovat SSH příkaz") { copy(session.sshCommand) }
+        commonTail
+    }
+
+    @ViewBuilder private var commonTail: some View {
         Divider()
         Button(session.favorite ? "Odebrat z oblíbených" : "Přidat do oblíbených") { store.toggleFavorite(session.id) }
-        Menu("Přesunout do skupiny") {
+        Menu("Přesunout do složky") {
             ForEach(store.groupNames.filter { $0 != session.group }, id: \.self) { g in
                 Button(g) { store.move(session.id, toGroup: g) }
             }
             Divider()
-            Button("Nová skupina…") {
-                if let g = askText("Nová skupina", "Název skupiny:") { store.move(session.id, toGroup: g) }
+            Button("Nová složka…") {
+                if let g = askText("Nová složka", "Název složky (podsložka: A/B):") { store.move(session.id, toGroup: g) }
             }
         }
         Divider()
@@ -421,13 +442,13 @@ struct SessionEditor: View {
             p.append("Host obsahuje nepovolené znaky (mezera, /, …).")
         }
         if !(1...65535).contains(s.port) { p.append("Port musí být 1–65535.") }
-        if s.user.contains(where: { $0 == " " || $0 == "@" }) { p.append("Uživatel nesmí obsahovat mezeru ani „@“.") }
+        if s.user.contains(" ") || (!s.isRDP && s.user.contains("@")) { p.append("Uživatel nesmí obsahovat mezeru ani „@“.") }
         if s.jumpHost.contains(" ") { p.append("Jump host nesmí obsahovat mezeru (formát user@bastion:port).") }
-        if s.group.trimmingCharacters(in: .whitespaces).isEmpty { p.append("Vyber nebo zadej skupinu.") }
+        if s.group.trimmingCharacters(in: .whitespaces).isEmpty { p.append("Vyber nebo zadej složku.") }
         if !name.isEmpty, existing.contains(where: {
             $0.id != s.id && $0.group == s.group && $0.name.caseInsensitiveCompare(name) == .orderedSame
         }) {
-            p.append("Ve skupině „\(s.group)“ už server s tímto názvem existuje.")
+            p.append("Ve složce „\(s.group)“ už server s tímto názvem existuje.")
         }
         // Stejná IP u více záznamů je v pořádku (různé účty / porty).
         return p
@@ -469,8 +490,13 @@ struct SessionEditor: View {
     private var form: some View {
         Form {
             Section("Základní informace") {
+                Picker("Protokol", selection: protoBinding) {
+                    Text("SSH").tag("ssh")
+                    Text("RDP (Windows)").tag("rdp")
+                }
+                .pickerStyle(.segmented)
                 TextField("Název serveru", text: $m.session.name, prompt: Text("např. fw1-praha"))
-                LabeledContent("Skupina") {
+                LabeledContent("Složka") {
                     HStack(spacing: 12) {
                         groupButton
                         Spacer()
@@ -499,8 +525,13 @@ struct SessionEditor: View {
                     }
                 }
                 TextField("Uživatel", text: $m.session.user, prompt: Text("admin"))
-                TextField("Jump host", text: $m.session.jumpHost, prompt: Text("user@bastion (ProxyJump)"))
+                if m.session.isRDP {
+                    TextField("Doména", text: $m.session.rdpDomain, prompt: Text("CORP (volitelné)"))
+                } else {
+                    TextField("Jump host", text: $m.session.jumpHost, prompt: Text("user@bastion (ProxyJump)"))
+                }
             }
+            if m.session.isRDP { rdpSections } else {
             Section("Autentizace") {
                 Picker("Způsob přihlášení", selection: $m.session.auth) {
                     Text("SSH agent / ~/.ssh/config").tag(AuthMethod.agent)
@@ -572,9 +603,59 @@ struct SessionEditor: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
+    }
+
+    // MARK: RDP
+
+    private var protoBinding: Binding<String> {
+        Binding(get: { m.session.proto }, set: { new in
+            if new == "rdp", m.session.port == 22 { m.session.port = 3389 }
+            if new == "ssh", m.session.port == 3389 { m.session.port = 22 }
+            m.session.proto = new
+        })
+    }
+
+    @ViewBuilder private var rdpSections: some View {
+        Section("Přihlášení") {
+            SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
+            Toggle("Před použitím hesla vyžadovat Touch ID / heslo Macu", isOn: $m.session.requireUserAuth)
+            Text("Heslo je jen v Klíčence macOS a FreeRDP ho dostane přes stdin (není vidět v seznamu procesů). Bez uloženého hesla se zeptá okno FreeRDP.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Section("RDP") {
+            Picker("Rozlišení", selection: $m.session.rdpSize) {
+                Text("Dynamické (podle okna)").tag("dynamic")
+                Text("Celá obrazovka").tag("fullscreen")
+                Text("1920 × 1080").tag("1920x1080")
+                Text("1680 × 1050").tag("1680x1050")
+                Text("1440 × 900").tag("1440x900")
+                Text("1280 × 800").tag("1280x800")
+            }
+            Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
+            Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)
+            Toggle("Sdílet domovskou složku Macu do relace", isOn: $m.session.rdpShareHome)
+            if m.session.rdpShareHome {
+                Label("Vzdálený server (a kdokoli s přístupem k relaci) uvidí soubory ve tvé domovské složce.",
+                      systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
+            }
+            TextField("RD Gateway", text: $m.session.rdpGateway, prompt: Text("gw.example.com (volitelné)"))
+            Picker("Certifikát serveru", selection: $m.session.rdpCertPolicy) {
+                Text("Zeptat se při neznámém / změněném").tag("")
+                Text("Důvěřovat při prvním připojení (TOFU)").tag("tofu")
+            }
+            TextField("Další argumenty FreeRDP", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
+                .font(.system(.body, design: .monospaced))
+            if let bin = FreeRDP.binary {
+                Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
+            } else {
+                Label("FreeRDP nenalezen – nainstaluj: brew install freerdp", systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Color.orange)
+            }
+        }
     }
 
     // MARK: Autentizace
@@ -643,7 +724,7 @@ struct SessionEditor: View {
         Button { m.groupQuery = ""; m.showGroups = true } label: {
             HStack(spacing: 6) {
                 Circle().fill(Color(hex: groupColors[m.session.group] ?? m.session.colorHex) ?? .gray).frame(width: 8, height: 8)
-                Text(m.session.group.isEmpty ? "Vybrat skupinu" : m.session.group)
+                Text(m.session.group.isEmpty ? "Vybrat složku" : m.session.group)
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 9)).foregroundStyle(.secondary)
             }
         }
@@ -661,12 +742,12 @@ struct SessionEditor: View {
             Button { m.session.colorHex = "" } label: {
                 HStack(spacing: 4) {
                     Circle().fill(Color(hex: groupHex) ?? .gray).frame(width: 12, height: 12)
-                    Text("Skupina").font(.system(size: 11))
+                    Text("Složka").font(.system(size: 11))
                 }
                 .padding(.horizontal, 7).frame(height: 22)
                 .background(Capsule().stroke(m.session.colorHex.isEmpty ? UI.accent : UI.border, lineWidth: m.session.colorHex.isEmpty ? 2 : 1))
             }
-            .buttonStyle(.plain).help("Automaticky podle skupiny (výchozí)")
+            .buttonStyle(.plain).help("Automaticky podle složky (výchozí)")
             ForEach(Self.palette, id: \.self) { h in
                 let sel = m.session.colorHex.uppercased() == h.uppercased()
                 Circle().fill(Color(hex: h) ?? .gray).frame(width: 16, height: 16)
@@ -766,11 +847,11 @@ private struct GroupPickerPopover: View {
             Divider()
             let q = m.groupQuery.trimmingCharacters(in: .whitespaces)
             if !q.isEmpty, !groups.contains(where: { $0.caseInsensitiveCompare(q) == .orderedSame }) {
-                Button { pick(q) } label: { Label("Vytvořit skupinu „\(q)“", systemImage: "plus") }.buttonStyle(.plain)
+                Button { pick(q) } label: { Label("Vytvořit složku „\(q)“", systemImage: "plus") }.buttonStyle(.plain)
             } else {
                 Button {
-                    if let n = askText("Nová skupina", "Název skupiny:") { pick(n) }
-                } label: { Label("Nová skupina…", systemImage: "plus") }.buttonStyle(.plain)
+                    if let n = askText("Nová složka", "Název složky (podsložka: A/B):") { pick(n) }
+                } label: { Label("Nová složka…", systemImage: "plus") }.buttonStyle(.plain)
             }
         }
         .padding(10)

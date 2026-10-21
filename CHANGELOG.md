@@ -303,3 +303,11 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.25.1
 
 - Aktualizace fungují i u aplikace sestavené ze ZIPu bez gitu: výchozí zdroj `johnyvobruba/SSHTool` a veřejný klíč podpisu jsou přímo v aplikaci.
+
+## 0.26.0
+
+- **RDP (Windows) přes FreeRDP**: v editoru serveru přepínač Protokol SSH / RDP. RDP relace se otevře ve vlastním okně FreeRDP (dvojklik na server, menu Připojit). Nastavení: doména, RD Gateway, rozlišení (dynamické / celá obrazovka / pevné), více monitorů, sdílená schránka, sdílení domovské složky (vypnuto, s varováním), politika certifikátu (zeptat se / TOFU – „ignorovat“ se nenabízí), další argumenty.
+  - Heslo z Klíčenky (volitelně s Touch ID) se předává FreeRDP přes stdin (`/args-from:stdin`), nikdy v příkazovém řádku. Bez uloženého hesla se zeptá okno FreeRDP.
+  - Běžící RDP relace má v levém panelu zelenou tečku, pravé tlačítko → Odpojit. U PROD serverů potvrzení.
+  - Požadavek: `brew install freerdp` (FreeRDP 3, SDL klient – bez XQuartz). Cestu lze nastavit v Nastavení → Obecné.
+- Sjednocené názvosloví: všude **složky** (místo „skupiny“) – sbalit / rozbalit všechny složky, přesunout do složky, barva složky, nová složka…

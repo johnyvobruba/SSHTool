@@ -124,7 +124,7 @@ struct SidebarSearchField: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(UI.textSecondary)
-            TextField("Název, IP nebo skupina…", text: text)
+            TextField("Název, IP nebo složka…", text: text)
                 .textFieldStyle(.plain)
             if !text.wrappedValue.isEmpty {
                 Button { text.wrappedValue = "" } label: {
@@ -175,7 +175,7 @@ struct GroupHeaderRow: View {
         .contentShape(Rectangle())
         .onHover { hover.on = $0 }
         .onTapGesture(perform: toggle)
-        .help(collapsed ? "Rozbalit skupinu" : "Sbalit skupinu")
+        .help(collapsed ? "Rozbalit složku" : "Sbalit složku")
     }
 }
 
@@ -215,7 +215,7 @@ struct SidebarSessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "desktopcomputer")
+            Image(systemName: session.isRDP ? "display" : "desktopcomputer")
                 .font(.system(size: 11))
                 .foregroundStyle(UI.sessionColor(session.resolvedColorHex))
             if comfortable {
