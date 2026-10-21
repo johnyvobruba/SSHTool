@@ -366,3 +366,13 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - RDP: úspěšná relace se pozná podle přihlášení do Windows (Logon Info), ne podle délky běhu –
   automaticky nalezené kompatibilní nastavení se uloží hned po přihlášení, i když relaci zavřeš do 30 s.
 - FreeRDP dostává `/log-filters:com.freerdp.client.common:INFO` (jen zpráva o přihlášení, log se tím téměř nezvětší).
+
+## 0.26.7
+
+- **Oprava „SSHTool Not Opened“ po aktualizaci:** updater odstraňoval karanténu macOS příkazem `xattr` a chybu ignoroval;
+  u souborů jen pro čtení (přibalené knihovny FreeRDP) karanténa zůstala a Gatekeeper aplikaci zablokoval.
+  - Karanténa se nyní odstraňuje přímo (removexattr) ze všech souborů, souborům jen pro čtení se doplní zápis pro vlastníka.
+  - Před instalací kontrola, že karanténa nikde nezůstala, a `codesign --verify --deep --strict`; když neprojde, nová verze se neinstaluje
+    a zobrazí se ruční postup.
+  - Build: `chmod -R u+w` na celou aplikaci před podpisem.
+- RDP: před spuštěním přibalené `SSHTool-RDP.app` se zkontroluje a odstraní karanténa; když to nejde, srozumitelná hláška s příkazy místo „Not Opened“.

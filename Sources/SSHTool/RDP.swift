@@ -107,6 +107,22 @@ final class RDPLauncher: ObservableObject {
             guard a.runModal() == .alertFirstButtonReturn else { return }
         }
         guard let bin = FreeRDP.binary else { FreeRDP.missingAlert(); return }
+        // přibalená SSHTool-RDP.app: karanténa by vedla k „Not Opened“ od Gatekeeperu → odstranit předem
+        if let r = bin.range(of: ".app/Contents/MacOS/") {
+            let helper = URL(fileURLWithPath: String(bin[..<r.lowerBound]) + ".app")
+            let left = Quarantine.strip(helper)
+            if !left.isEmpty {
+                let a = NSAlert(); a.alertStyle = .warning
+                a.messageText = "macOS blokuje přibalený FreeRDP (karanténa)"
+                a.informativeText = "Aplikace má po stažení atribut karantény a Gatekeeper by spuštění RDP zablokoval.\n\n" + Quarantine.manualFix
+                a.addButton(withTitle: "Kopírovat příkazy"); a.addButton(withTitle: "Zavřít")
+                if a.runModal() == .alertFirstButtonReturn {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString("sudo chmod -R u+w /Applications/SSHTool.app\nxattr -dr com.apple.quarantine /Applications/SSHTool.app", forType: .string)
+                }
+                return
+            }
+        }
         if s.envTag == "prod" {
             let a = NSAlert(); a.alertStyle = .warning
             a.messageText = "Připojit se k produkčnímu serveru \(s.name)?"

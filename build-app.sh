@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.26.6}"
+VERSION="${VERSION_OVERRIDE:-0.26.7}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -152,6 +152,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+# žádný soubor jen pro čtení (knihovny z Homebrew bývají 444) – jinak u uživatele nejde odstranit karanténa
+chmod -R u+w "$APP"
 
 echo "▶ Podepisuji (${IDENTITY})…"
 RDP_APP="$APP/Contents/Helpers/SSHTool-RDP.app"

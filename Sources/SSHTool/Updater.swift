@@ -152,7 +152,14 @@ final class Updater: ObservableObject {
                       (b.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) == v else {
                     throw UpdateError("Balíček neobsahuje očekávanou aplikaci (bundle id / verze nesouhlasí).")
                 }
-                try? Self.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
+                // karanténa macOS pryč ze VŠECH souborů (i z knihoven jen pro čtení a vnořené SSHTool-RDP.app),
+                // jinak Gatekeeper novou verzi zablokuje („Not Opened“)
+                let left = Quarantine.strip(newApp)
+                guard left.isEmpty else {
+                    throw UpdateError("Z nové verze nejde odstranit karanténu macOS (\(left.count) souborů, např. \(left[0].replacingOccurrences(of: newApp.path, with: "SSHTool.app"))). Instalace zrušena.\n\n" + Quarantine.manualFix)
+                }
+                do { try Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path]) }
+                catch { throw UpdateError("Podpis kódu nové verze neprošel kontrolou (codesign --verify) – instalace zrušena.") }
                 await MainActor.run { self.replaceAndRelaunch(newApp: newApp, version: v) }
             } catch {
                 await MainActor.run {
@@ -184,6 +191,7 @@ final class Updater: ObservableObject {
             if let t = trashed as URL? { try? FileManager.default.moveItem(at: t, to: current) }   // vrátit původní
             info("Aktualizace selhala", error.localizedDescription); return
         }
+        Quarantine.strip(current)        // pojistka po přesunu
         // pomocný proces: počká na ukončení této instance a spustí novou verzi
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -207,5 +215,39 @@ final class Updater: ObservableObject {
 
     private func info(_ title: String, _ text: String) {
         let a = NSAlert(); a.messageText = title; a.informativeText = text; a.runModal()
+    }
+}
+
+/// Atribut karantény macOS (com.apple.quarantine) – u nenotarizované aplikace kvůli němu Gatekeeper hlásí „Not Opened“.
+enum Quarantine {
+    static let attr = "com.apple.quarantine"
+
+    static let manualFix = """
+    Ruční oprava v Terminálu:
+      sudo chmod -R u+w /Applications/SSHTool.app
+      xattr -dr com.apple.quarantine /Applications/SSHTool.app
+    """
+
+    static func has(_ path: String) -> Bool { getxattr(path, attr, nil, 0, 0, XATTR_NOFOLLOW) >= 0 }
+
+    /// Odstraní karanténu z položky a všeho uvnitř. Soubory jen pro čtení dostanou zápis pro vlastníka
+    /// (bez něj removexattr selže). Vrací cesty, kde karanténa zůstala.
+    @discardableResult
+    static func strip(_ root: URL) -> [String] {
+        let fm = FileManager.default
+        var paths = [root.path]
+        if let e = fm.enumerator(atPath: root.path) {
+            for case let rel as String in e { paths.append(root.path + "/" + rel) }
+        }
+        var left: [String] = []
+        for p in paths where has(p) {
+            if removexattr(p, attr, XATTR_NOFOLLOW) == 0 { continue }
+            if let perm = (try? fm.attributesOfItem(atPath: p))?[.posixPermissions] as? NSNumber {
+                try? fm.setAttributes([.posixPermissions: perm.intValue | 0o200], ofItemAtPath: p)
+                if removexattr(p, attr, XATTR_NOFOLLOW) == 0 { continue }
+            }
+            left.append(p)
+        }
+        return left
     }
 }
