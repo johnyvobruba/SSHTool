@@ -38,9 +38,15 @@ jobs:
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then echo "release=false" >> "$GITHUB_OUTPUT"; else echo "release=true" >> "$GITHUB_OUTPUT"; fi
           echo "Verze $VERSION"
 
+      - name: FreeRDP pro přibalení (RDP bez instalace u uživatelů)
+        run: |
+          brew install freerdp dylibbundler
+          ls /opt/homebrew/bin | grep -i freerdp || true
+
       - name: Build
         env:
           GITHUB_REPO: ${{ github.repository }}
+          BUNDLE_FREERDP: "1"
         run: bash ./build-app.sh       # bash explicitně – nezávisí na příznaku spustitelnosti v gitu
 
       - name: Balíček a podpis

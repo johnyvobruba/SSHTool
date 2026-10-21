@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.26.0}"
+VERSION="${VERSION_OVERRIDE:-0.26.1}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -31,6 +31,41 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 mkdir -p "$APP/Contents/Resources/cs.lproj"   # čeština = jazyk aplikace (systémové menu, titulky oken)
 cp "$BIN" "$APP/Contents/MacOS/${APP_NAME}"
+IDENTITY="${SIGN_IDENTITY:--}"
+
+# FreeRDP přibalený do aplikace (RDP bez „brew install freerdp“ u každého uživatele).
+#   BUNDLE_FREERDP=auto (výchozí) – přibalí, pokud je na stroji freerdp + dylibbundler
+#   BUNDLE_FREERDP=1 – vyžadováno (CI), BUNDLE_FREERDP=0 – nepřibalovat
+if [[ "${BUNDLE_FREERDP:-auto}" != "0" ]]; then
+  FRDP=""
+  for c in sdl-freerdp sdl-freerdp3 sdl3-freerdp; do
+    for d in /opt/homebrew/bin /usr/local/bin; do
+      if [[ -x "$d/$c" ]]; then FRDP="$d/$c"; break 2; fi
+    done
+  done
+  if [[ -n "$FRDP" ]] && command -v dylibbundler >/dev/null; then
+    echo "▶ Přibaluji FreeRDP ($FRDP)…"
+    H="$APP/Contents/Helpers/FreeRDP"
+    mkdir -p "$H/lib"
+    cp "$(realpath "$FRDP")" "$H/sdl-freerdp"
+    chmod u+w "$H/sdl-freerdp"
+    BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+    SEARCH=(-s "$BREW_PREFIX/lib")
+    for f in freerdp sdl3 sdl2 sdl3_ttf sdl2_ttf openssl@3 ffmpeg cjson jpeg-turbo krb5 libusb pkcs11-helper; do
+      [[ -d "$BREW_PREFIX/opt/$f/lib" ]] && SEARCH+=(-s "$BREW_PREFIX/opt/$f/lib")
+    done
+    # dylibbundler zkopíruje závislé knihovny a přepíše cesty na @executable_path/lib/
+    dylibbundler -of -b -x "$H/sdl-freerdp" -d "$H/lib" -p @executable_path/lib/ "${SEARCH[@]}" </dev/null >/dev/null
+    ls "$H/lib" > "$H/BUNDLED-LIBS.txt"
+    for f in "$H/lib/"*.dylib "$H/sdl-freerdp"; do codesign --force --sign "$IDENTITY" "$f" 2>/dev/null; done
+    echo "  $(ls "$H/lib" | wc -l | tr -d ' ') knihoven, $(du -sh "$H" | cut -f1)"
+  elif [[ "${BUNDLE_FREERDP:-auto}" == "1" ]]; then
+    echo "✗ BUNDLE_FREERDP=1, ale chybí freerdp nebo dylibbundler (brew install freerdp dylibbundler)"; exit 1
+  else
+    echo "▶ FreeRDP se nepřibaluje (pro přibalení: brew install freerdp dylibbundler)"
+  fi
+fi
+[[ -f THIRD-PARTY-NOTICES.md ]] && cp THIRD-PARTY-NOTICES.md "$APP/Contents/Resources/"
 
 # Ikona: Resources/AppIcon.png (1024×1024) → AppIcon.icns přes sips + iconutil (součást macOS)
 ICON_PLIST=""
@@ -72,7 +107,6 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-IDENTITY="${SIGN_IDENTITY:--}"
 echo "▶ Podepisuji (${IDENTITY})…"
 codesign --force --options runtime --sign "$IDENTITY" "$APP"
 

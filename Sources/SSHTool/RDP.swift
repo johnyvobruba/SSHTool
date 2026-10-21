@@ -15,6 +15,9 @@ enum FreeRDP {
     @MainActor static var binary: String? {
         let custom = Prefs.current.freerdpPath.trimmingCharacters(in: .whitespaces)
         if !custom.isEmpty { return FileManager.default.isExecutableFile(atPath: custom) ? custom : nil }
+        // přibalený v aplikaci (vydání z GitHubu)
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/FreeRDP/sdl-freerdp").path
+        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
         for c in candidates { for d in dirs where FileManager.default.isExecutableFile(atPath: "\(d)/\(c)") { return "\(d)/\(c)" } }
         return nil
     }
@@ -22,7 +25,7 @@ enum FreeRDP {
     @MainActor static func missingAlert() {
         let a = NSAlert()
         a.messageText = "FreeRDP není nainstalovaný"
-        a.informativeText = "RDP relace používají FreeRDP 3 (SDL klient).\n\nNainstaluj ho v Terminálu:\n    brew install freerdp\n\nPokud je jinde, nastav cestu v Nastavení → Obecné → FreeRDP."
+        a.informativeText = "Tato kopie SSHTool nemá FreeRDP přibalený (vydání z GitHubu ho obsahují).\n\nNainstaluj ho v Terminálu:\n    brew install freerdp\n\nPokud je jinde, nastav cestu v Nastavení → Obecné → FreeRDP."
         a.addButton(withTitle: "Kopírovat příkaz")
         a.addButton(withTitle: "Zavřít")
         if a.runModal() == .alertFirstButtonReturn {

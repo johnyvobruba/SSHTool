@@ -10,7 +10,7 @@ Inspirovaný Tabby, MobaXterm a Termius – ale rychlý, nativní a s důrazem n
 | Oblast | Co umí |
 |---|---|
 | **Servery** | Skupiny s barvami, oblíbené, hledání, štítky prostředí PROD / STAGE / TEST / DEV, přesun mezi skupinami tažením, import / export JSON (bez hesel), vzor JSON pro kolegy |
-| **RDP** | Windows servery přes FreeRDP 3 v samostatném okně, heslo z Klíčenky přes stdin, gateway, více monitorů, schránka (`brew install freerdp`) |
+| **RDP** | Windows servery přes FreeRDP 3 v samostatném okně, heslo z Klíčenky přes stdin, gateway, více monitorů, schránka – FreeRDP je ve vydáních přibalený |
 | **Přihlášení** | SSH agent / `~/.ssh/config`, Bitwarden SSH agent, soukromý klíč (passphrase v Klíčence), heslo v Klíčence macOS s Touch ID, interaktivní (OTP), jump host |
 | **Terminál** | Záložky, rozdělení až na 4 panely, broadcast vstupu s potvrzením, režim soustředění, 6 barevných profilů, vyhledávání, scrollback až 100 000 řádků, ⌥ znaky pro CZ klávesnici |
 | **Zvýrazňování** | Pravidla (text / regex) ve skupinách, test výrazu, detekce konfliktů, ochrana výkonu |

@@ -311,3 +311,9 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Běžící RDP relace má v levém panelu zelenou tečku, pravé tlačítko → Odpojit. U PROD serverů potvrzení.
   - Požadavek: `brew install freerdp` (FreeRDP 3, SDL klient – bez XQuartz). Cestu lze nastavit v Nastavení → Obecné.
 - Sjednocené názvosloví: všude **složky** (místo „skupiny“) – sbalit / rozbalit všechny složky, přesunout do složky, barva složky, nová složka…
+
+## 0.26.1
+
+- **FreeRDP přibalený v aplikaci**: vydání z GitHubu obsahují klienta FreeRDP i jeho knihovny (`Contents/Helpers/FreeRDP`) – RDP funguje bez `brew install freerdp`. Pořadí hledání: vlastní cesta z nastavení → přibalený → Homebrew.
+- Lokální sestavení FreeRDP přibalí automaticky, pokud je nainstalovaný `freerdp` a `dylibbundler` (`BUNDLE_FREERDP=0` vypne).
+- THIRD-PARTY-NOTICES.md s licencemi přibalených komponent.
