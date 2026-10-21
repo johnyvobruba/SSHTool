@@ -50,6 +50,10 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var rdpShareHome = false            // přesměrování domovské složky Macu do RDP relace
     var rdpCertPolicy = ""              // "" = zeptat se, "tofu" = důvěřovat při prvním připojení
     var rdpExtraArgs = ""
+    var rdpSecurity = ""                // "" = automaticky, "nla", "tls", "rdp"
+    var rdpBpp = 0                      // 0 = výchozí (32), 24, 16
+    var rdpGfx = true                   // grafický kanál GFX (H.264/AVC, progressive)
+    var rdpUDP = true                   // UDP multitransport
 
     var isRDP: Bool { proto == "rdp" }
 
@@ -66,7 +70,8 @@ struct SSHSession: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
-             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpCertPolicy, rdpExtraArgs
+             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpCertPolicy, rdpExtraArgs,
+             rdpSecurity, rdpBpp, rdpGfx, rdpUDP
     }
 
     var usesStoredPassword: Bool { auth == .password && hasStoredPassword }
@@ -583,6 +588,12 @@ extension SSHSession {
         rdpShareHome = try c.decodeIfPresent(Bool.self, forKey: .rdpShareHome) ?? false
         rdpCertPolicy = (try c.decodeIfPresent(String.self, forKey: .rdpCertPolicy)) == "tofu" ? "tofu" : ""
         rdpExtraArgs = try c.decodeIfPresent(String.self, forKey: .rdpExtraArgs) ?? ""
+        let sec = try c.decodeIfPresent(String.self, forKey: .rdpSecurity) ?? ""
+        rdpSecurity = ["nla", "tls", "rdp"].contains(sec) ? sec : ""
+        let bpp = try c.decodeIfPresent(Int.self, forKey: .rdpBpp) ?? 0
+        rdpBpp = [32, 24, 16].contains(bpp) ? bpp : 0
+        rdpGfx = try c.decodeIfPresent(Bool.self, forKey: .rdpGfx) ?? true
+        rdpUDP = try c.decodeIfPresent(Bool.self, forKey: .rdpUDP) ?? true
     }
 }
 

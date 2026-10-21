@@ -902,6 +902,9 @@ struct SettingsServersPane: View {
         ("rdpDomain, rdpGateway", "ne", "RDP: doména, RD Gateway"),
         ("rdpSize", "ne", "RDP: dynamic, fullscreen nebo 1920x1080…"),
         ("rdpClipboard, rdpMultiMon", "ne", "RDP: true/false"),
+        ("rdpSecurity", "ne", "RDP: \"\" (auto), nla, tls, rdp"),
+        ("rdpBpp", "ne", "RDP: 0 (výchozí), 24, 16"),
+        ("rdpGfx, rdpUDP", "ne", "RDP: true/false – grafický kanál GFX, UDP multitransport"),
     ]
 
     var body: some View {

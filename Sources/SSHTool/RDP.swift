@@ -50,6 +50,10 @@ enum FreeRDP {
         if s.rdpShareHome { a.append("/drive:Home,\(NSHomeDirectory())") }
         if !s.rdpGateway.isEmpty { a.append("/g:\(s.rdpGateway)") }
         if s.rdpCertPolicy == "tofu" { a.append("/cert:tofu") }      // „ignore“ se záměrně nenabízí
+        if !s.rdpSecurity.isEmpty { a.append("/sec:\(s.rdpSecurity)") }
+        if s.rdpBpp > 0 { a.append("/bpp:\(s.rdpBpp)") }
+        if !s.rdpGfx { a.append("-gfx") }
+        if !s.rdpUDP { a.append("-multitransport") }
         a += s.rdpExtraArgs.split(separator: " ").map(String.init)
         return a
     }

@@ -544,8 +544,10 @@ struct SessionEditor: View {
             Section {
                 DisclosureGroup("Pokročilé SSH nastavení", isExpanded: $m.advanced) {
                     VStack(alignment: .leading, spacing: 10) {
-                        TextField("Další argumenty", text: $m.session.extraArgs, prompt: Text("-o ServerAliveCountMax=3"))
-                            .font(.system(.body, design: .monospaced))
+                        LabeledContent("Další argumenty") {
+                            TextField("", text: $m.session.extraArgs, prompt: Text("-o ServerAliveCountMax=3"))
+                                .labelsHidden().font(.system(.body, design: .monospaced))
+                        }
                         ForEach(m.session.extraArgsWarnings, id: \.self) { w in
                             Label(w, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
                         }
@@ -647,8 +649,31 @@ struct SessionEditor: View {
                 Text("Zeptat se při neznámém / změněném").tag("")
                 Text("Důvěřovat při prvním připojení (TOFU)").tag("tofu")
             }
-            TextField("Další argumenty FreeRDP", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
-                .font(.system(.body, design: .monospaced))
+        }
+        Section("Zabezpečení a kompatibilita") {
+            Picker("Zabezpečení", selection: $m.session.rdpSecurity) {
+                Text("Automaticky").tag("")
+                Text("NLA (doporučeno)").tag("nla")
+                Text("TLS (bez NLA)").tag("tls")
+                Text("RDP (starší, nešifrované ověření)").tag("rdp")
+            }
+            if m.session.rdpSecurity == "tls" || m.session.rdpSecurity == "rdp" {
+                Label("Bez NLA server ukáže přihlášení ještě před ověřením uživatele. Používej jen tam, kde NLA nefunguje.",
+                      systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
+            }
+            Picker("Barevná hloubka", selection: $m.session.rdpBpp) {
+                Text("Výchozí (32 bit)").tag(0)
+                Text("24 bit").tag(24)
+                Text("16 bit").tag(16)
+            }
+            Toggle("Grafický kanál GFX (H.264)", isOn: $m.session.rdpGfx)
+            Toggle("UDP multitransport", isOn: $m.session.rdpUDP)
+            Text("Když se okno RDP otevře a hned zavře (TRANSPORT_FAILED), zkus vypnout GFX a UDP, nastavit 24 bit a případně zabezpečení TLS.")
+                .font(.caption).foregroundStyle(.secondary)
+            LabeledContent("Další argumenty FreeRDP") {
+                TextField("", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
+                    .labelsHidden().font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)
+            }
             if let bin = FreeRDP.binary {
                 Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
             } else {
