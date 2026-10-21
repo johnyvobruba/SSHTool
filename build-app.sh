@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.26.4}"
+VERSION="${VERSION_OVERRIDE:-0.26.5}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -45,21 +45,66 @@ if [[ "${BUNDLE_FREERDP:-auto}" != "0" ]]; then
   done
   if [[ -n "$FRDP" ]] && command -v dylibbundler >/dev/null; then
     echo "▶ Přibaluji FreeRDP ($FRDP)…"
-    H="$APP/Contents/Helpers/FreeRDP"
-    mkdir -p "$H/lib"
+    # FreeRDP jako malá vnořená aplikace → okno RDP má v Docku ikonu a název SSHTool
+    RA="$APP/Contents/Helpers/SSHTool-RDP.app"
+    H="$RA/Contents/MacOS"
+    FW="$RA/Contents/Frameworks"
+    mkdir -p "$H" "$FW" "$RA/Contents/Resources"
     cp "$(realpath "$FRDP")" "$H/sdl-freerdp"
     chmod u+w "$H/sdl-freerdp"
+    cat > "$RA/Contents/Info.plist" <<RPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>${APP_NAME} RDP</string>
+  <key>CFBundleDisplayName</key><string>${APP_NAME} RDP</string>
+  <key>CFBundleExecutable</key><string>sdl-freerdp</string>
+  <key>CFBundleIdentifier</key><string>${BUNDLE_ID}.rdp</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+RPLIST
     BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
     SEARCH=(-s "$BREW_PREFIX/lib")
     for f in freerdp sdl3 sdl2 sdl3_ttf sdl2_ttf openssl@3 ffmpeg cjson jpeg-turbo krb5 libusb pkcs11-helper; do
       [[ -d "$BREW_PREFIX/opt/$f/lib" ]] && SEARCH+=(-s "$BREW_PREFIX/opt/$f/lib")
     done
-    # dylibbundler zkopíruje závislé knihovny a přepíše cesty na @executable_path/lib/
-    dylibbundler -of -b -x "$H/sdl-freerdp" -d "$H/lib" -p @executable_path/lib/ "${SEARCH[@]}" </dev/null >/dev/null
-    # seznam knihoven do Resources – v Contents/Helpers smí být jen podepsaný kód (jinak codesign selže)
-    ls "$H/lib" > "$APP/Contents/Resources/FreeRDP-BUNDLED-LIBS.txt"
-    for f in "$H/lib/"*.dylib "$H/sdl-freerdp"; do codesign --force --sign "$IDENTITY" "$f" 2>/dev/null; done
-    echo "  $(ls "$H/lib" | wc -l | tr -d ' ') knihoven, $(du -sh "$H" | cut -f1)"
+    # dylibbundler zkopíruje závislé knihovny a přepíše cesty na @executable_path/../Frameworks/
+    dylibbundler -of -b -x "$H/sdl-freerdp" -d "$FW" -p @executable_path/../Frameworks/ "${SEARCH[@]}" </dev/null >/dev/null
+    # OpenSSL „legacy“ provider (MD4/RC4) – bez něj FreeRDP nemá NTLM, takže NLA/CredSSP
+    # mimo doménu (Kerberos) selže. Načítá se dynamicky, dylibbundler ho nenajde → kopie ručně,
+    # cesta se předává přes OPENSSL_MODULES při spuštění (RDP.swift).
+    LEGACY="$BREW_PREFIX/opt/openssl@3/lib/ossl-modules/legacy.dylib"
+    if [[ -f "$LEGACY" ]]; then
+      mkdir -p "$FW/ossl-modules"
+      cp "$(realpath "$LEGACY")" "$FW/ossl-modules/legacy.dylib"
+      chmod u+w "$FW/ossl-modules/legacy.dylib"
+      install_name_tool -id "@loader_path/legacy.dylib" "$FW/ossl-modules/legacy.dylib" 2>/dev/null || true
+      # případné závislosti na libcrypto/libssl přesměrovat na přibalené kopie
+      otool -L "$FW/ossl-modules/legacy.dylib" | tail -n +2 | awk '{print $1}' | while read -r dep; do
+        b="$(basename "$dep")"
+        if [[ "$dep" != /usr/lib/* && "$dep" != /System/* && "$dep" != @* && -f "$FW/$b" ]]; then
+          install_name_tool -change "$dep" "@loader_path/../$b" "$FW/ossl-modules/legacy.dylib"
+        fi
+      done
+      codesign --force --sign "$IDENTITY" "$FW/ossl-modules/legacy.dylib" 2>/dev/null
+      echo "  + OpenSSL legacy provider (NTLM pro NLA)"
+    elif [[ "${BUNDLE_FREERDP:-auto}" == "1" ]]; then
+      echo "✗ Chybí $LEGACY (OpenSSL legacy provider, nutný pro NTLM/NLA)"; exit 1
+    else
+      echo "  ! OpenSSL legacy provider nenalezen – NLA přes NTLM nebude fungovat"
+    fi
+    # seznam knihoven do Resources hlavní aplikace (v Helpers smí být jen podepsaný kód)
+    ls "$FW" > "$APP/Contents/Resources/FreeRDP-BUNDLED-LIBS.txt"
+    for f in "$FW/"*.dylib; do codesign --force --sign "$IDENTITY" "$f" 2>/dev/null; done
+    echo "  $(ls "$FW"/*.dylib | wc -l | tr -d ' ') knihoven, $(du -sh "$RA" | cut -f1)"
+    # samotná vnořená aplikace se podepíše až po vytvoření ikony (níže)
   elif [[ "${BUNDLE_FREERDP:-auto}" == "1" ]]; then
     echo "✗ BUNDLE_FREERDP=1, ale chybí freerdp nebo dylibbundler (brew install freerdp dylibbundler)"; exit 1
   else
@@ -109,6 +154,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "▶ Podepisuji (${IDENTITY})…"
+RDP_APP="$APP/Contents/Helpers/SSHTool-RDP.app"
+if [[ -d "$RDP_APP" ]]; then
+  [[ -f "$APP/Contents/Resources/AppIcon.icns" ]] && cp "$APP/Contents/Resources/AppIcon.icns" "$RDP_APP/Contents/Resources/"
+  codesign --force --sign "$IDENTITY" "$RDP_APP"
+fi
 codesign --force --options runtime --sign "$IDENTITY" "$APP"
 
 [[ -n "$UPDATE_REPO" ]] && echo "▶ Aktualizace: github.com/${UPDATE_REPO}" || echo "▶ Aktualizace: vypnuté (repo není nastavené)"

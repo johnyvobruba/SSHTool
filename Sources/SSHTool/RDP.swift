@@ -16,8 +16,11 @@ enum FreeRDP {
         let custom = Prefs.current.freerdpPath.trimmingCharacters(in: .whitespaces)
         if !custom.isEmpty { return FileManager.default.isExecutableFile(atPath: custom) ? custom : nil }
         // přibalený v aplikaci (vydání z GitHubu)
-        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/FreeRDP/sdl-freerdp").path
-        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
+        // (od 0.26.5 jako vnořená SSHTool-RDP.app kvůli ikoně v Docku; starší umístění jako záloha)
+        for rel in ["Contents/Helpers/SSHTool-RDP.app/Contents/MacOS/sdl-freerdp", "Contents/Helpers/FreeRDP/sdl-freerdp"] {
+            let bundled = Bundle.main.bundleURL.appendingPathComponent(rel).path
+            if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
+        }
         for c in candidates { for d in dirs where FileManager.default.isExecutableFile(atPath: "\(d)/\(c)") { return "\(d)/\(c)" } }
         return nil
     }
@@ -180,6 +183,15 @@ final class RDPLauncher: ObservableObject {
     private func start(bin: String, session s: SSHSession, password: String?, tuned: Bool = false) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
+        // přibalený OpenSSL legacy provider (MD4 → NTLM → NLA bez domény)
+        let binDir = URL(fileURLWithPath: bin).deletingLastPathComponent()
+        if let modules = [binDir.appendingPathComponent("../Frameworks/ossl-modules").standardized.path,
+                          binDir.appendingPathComponent("ossl-modules").path]
+            .first(where: { FileManager.default.fileExists(atPath: $0 + "/legacy.dylib") }) {
+            var env = ProcessInfo.processInfo.environment
+            env["OPENSSL_MODULES"] = modules
+            p.environment = env
+        }
         let args = FreeRDP.arguments(s)
         p.arguments = password == nil ? args : ["/args-from:stdin"]
         let inPipe = Pipe(), errPipe = Pipe()

@@ -350,3 +350,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - RDP: tlačítko ⏏ pro odpojení u běžící relace v levém panelu.
 - RDP: nápověda klávesových zkratek FreeRDP (pravý ⇧ + Enter celá obrazovka, pravý ⇧ + D odpojit…) – při prvním RDP připojení a v editoru serveru.
 - Import serverů (JSON) zná pole `rdpDebugLog`.
+
+## 0.26.5
+
+- **Oprava NLA:** přibalený FreeRDP neměl OpenSSL „legacy“ provider (MD4/RC4), takže chybělo NTLM
+  a přihlášení přes NLA na počítače mimo doménu končilo pádem relace. Provider se nyní přibaluje
+  (`ossl-modules` vedle přibalených knihoven) a předává přes `OPENSSL_MODULES`.
+- Servery, kterým automatická detekce uložila TLS, lze vrátit na NLA tlačítkem „Obnovit výchozí a detekovat znovu“.
+- Okno RDP relace má v Docku a v přepínači ⌘Tab ikonu a název „SSHTool RDP“ – FreeRDP je nově přibalený
+  jako vnořená aplikace `Contents/Helpers/SSHTool-RDP.app` (knihovny v jejím `Contents/Frameworks`).
