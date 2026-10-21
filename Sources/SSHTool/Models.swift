@@ -55,6 +55,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var rdpGfx = true                   // grafický kanál GFX (H.264/AVC, progressive)
     var rdpUDP = true                   // UDP multitransport
     var rdpAutoDetect = true            // při selhání zkusit kompatibilní režim a uložit ho
+    var rdpDebugLog = false             // /log-level:DEBUG do logu relace
 
     var isRDP: Bool { proto == "rdp" }
 
@@ -72,7 +73,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
              proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpCertPolicy, rdpExtraArgs,
-             rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect
+             rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
 
     var usesStoredPassword: Bool { auth == .password && hasStoredPassword }
@@ -596,6 +597,7 @@ extension SSHSession {
         rdpGfx = try c.decodeIfPresent(Bool.self, forKey: .rdpGfx) ?? true
         rdpUDP = try c.decodeIfPresent(Bool.self, forKey: .rdpUDP) ?? true
         rdpAutoDetect = try c.decodeIfPresent(Bool.self, forKey: .rdpAutoDetect) ?? true
+        rdpDebugLog = try c.decodeIfPresent(Bool.self, forKey: .rdpDebugLog) ?? false
     }
 }
 

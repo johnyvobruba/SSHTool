@@ -34,15 +34,31 @@ enum FreeRDP {
         }
     }
 
+    /// Velikost okna pro start relace: viditelná plocha hlavní obrazovky (body), ne výchozích 1024×768.
+    @MainActor static var initialSize: String? {
+        guard let f = NSScreen.main?.visibleFrame, f.width > 400, f.height > 300 else { return nil }
+        return "\(Int(f.width))x\(Int(f.height) - 32)"      // rezerva na titulek okna
+    }
+
+    /// Log poslední relace: ~/Library/Logs/SSHTool/rdp-<název>.log
+    static func logURL(for s: SSHSession) -> URL {
+        let safe = String(s.name.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "." ? $0 : "_" })
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/SSHTool", isDirectory: true)
+            .appendingPathComponent("rdp-\(safe.isEmpty ? s.id.uuidString : safe).log")
+    }
+
     /// Argumenty pro FreeRDP (bez hesla).
-    static func arguments(_ s: SSHSession) -> [String] {
+    @MainActor static func arguments(_ s: SSHSession) -> [String] {
         let host = s.host.contains(":") && !s.host.hasPrefix("[") ? "[\(s.host)]" : s.host
         var a = ["/v:\(host):\(s.port)", "/title:SSHTool – \(s.name)"]
         if !s.user.isEmpty { a.append("/u:\(s.user)") }
         if !s.rdpDomain.isEmpty { a.append("/d:\(s.rdpDomain)") }
         switch s.rdpSize {
         case "fullscreen": a.append("/f")
-        case "dynamic", "": a.append("/dynamic-resolution")
+        case "dynamic", "":
+            a.append("/dynamic-resolution")
+            if let size = initialSize { a.append("/size:\(size)") }
         default: a.append("/size:\(s.rdpSize)")
         }
         if s.rdpMultiMon { a.append("/multimon") }
@@ -54,11 +70,12 @@ enum FreeRDP {
         if s.rdpBpp > 0 { a.append("/bpp:\(s.rdpBpp)") }
         if !s.rdpGfx { a.append("-gfx") }
         if !s.rdpUDP { a.append("-multitransport") }
+        if s.rdpDebugLog { a.append("/log-level:DEBUG") }
         a += s.rdpExtraArgs.split(separator: " ").map(String.init)
         return a
     }
 
-    static func commandLine(_ s: SSHSession) -> String {
+    @MainActor static func commandLine(_ s: SSHSession) -> String {
         (["sdl-freerdp"] + arguments(s)).map { $0.contains(" ") ? "'\($0)'" : $0 }.joined(separator: " ")
     }
 }
@@ -88,6 +105,7 @@ final class RDPLauncher: ObservableObject {
             a.addButton(withTitle: "Připojit"); a.addButton(withTitle: "Zrušit")
             guard a.runModal() == .alertFirstButtonReturn else { return }
         }
+        Self.showHotkeysOnce()
         let stored = s.hasStoredPassword
         let sid = s.id.uuidString, needAuth = s.requireUserAuth, name = s.name
         Task.detached {
@@ -169,17 +187,26 @@ final class RDPLauncher: ObservableObject {
         p.standardOutput = errPipe            // WLog píše část chyb na stdout – sbíráme obojí
         p.standardError = errPipe
         let errBox = Box<String>("")
+        let df = ISO8601DateFormatter()
+        let shown = args.map { $0.contains(" ") ? "'\($0)'" : $0 }.joined(separator: " ")
+        let sink = RDPLogSink(url: FreeRDP.logURL(for: s), fresh: !tuned,
+                              header: "\n===== \(df.string(from: Date())) · \(tuned ? "kompatibilní pokus" : "připojení") · \(s.name)\n" +
+                                      "FreeRDP: \(bin)\nArgumenty: \(shown)\(password == nil ? "" : " /p:********")\n\n",
+                              secret: password)
         errPipe.fileHandleForReading.readabilityHandler = { h in
             let d = h.availableData
             guard !d.isEmpty else { h.readabilityHandler = nil; return }
+            let text = String(decoding: d, as: UTF8.self)
+            sink.write(text)
             errBox.mutate {
-                $0 += String(decoding: d, as: UTF8.self)
-                if $0.count > 16000 { $0 = String($0.suffix(12000)) }
+                $0 += text
+                if $0.count > 64000 { $0 = String($0.suffix(48000)) }
             }
         }
         let started = Date(), id = s.id, name = s.name
         p.terminationHandler = { proc in
             let code = proc.terminationStatus
+            sink.close("\n===== konec · kód \(code) · \(Int(Date().timeIntervalSince(started))) s\n")
             DispatchQueue.main.async {
                 if self.running[id] === proc { self.running[id] = nil }
                 self.onChange?()
@@ -199,12 +226,15 @@ final class RDPLauncher: ObservableObject {
                 if info.isEmpty { info = "FreeRDP skončil chybou. Zkontroluj host, port a přihlašovací údaje." }
                 if tuned { info += "\n\nZkoušel jsem i kompatibilní režim (bez GFX/UDP, 24 bit\(s.rdpSecurity == "tls" ? ", TLS" : ""))." }
                 a.informativeText = info
-                a.runModal()
+                a.addButton(withTitle: "OK")
+                a.addButton(withTitle: "Zobrazit log")
+                if a.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(FreeRDP.logURL(for: s)) }
             }
         }
         do {
             try p.run()
         } catch {
+            sink.close("Spuštění selhalo: \(error.localizedDescription)\n")
             let a = NSAlert(); a.messageText = "FreeRDP nelze spustit"; a.informativeText = error.localizedDescription; a.runModal()
             return
         }
@@ -224,7 +254,60 @@ final class RDPLauncher: ObservableObject {
         }
     }
 
+    static let hotkeysText = """
+    Okno FreeRDP se ovládá zkratkami s pravým Shiftem:
+      pravý ⇧ + Enter – celá obrazovka / okno
+      pravý ⇧ + D – odpojit relaci
+      pravý ⇧ + M – minimalizovat
+      pravý ⇧ + G – zachytávání klávesnice (⌘Tab apod. jde do Windows)
+      pravý ⇧ + R – povolit změnu velikosti okna
+    Odpojit jde také tlačítkem ⏏ u serveru v levém panelu SSHTool.
+    """
+
+    private static func showHotkeysOnce() {
+        let key = "SSHTool.rdpHotkeysShown"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        let a = NSAlert()
+        a.messageText = "Ovládání RDP relace"
+        a.informativeText = hotkeysText
+        a.runModal()
+    }
+
     func disconnect(_ id: UUID) {
         running[id]?.terminate()
+    }
+}
+
+/// Zápis výstupu FreeRDP do logu (z vlákna čtení roury). Heslo se v logu maskuje.
+final class RDPLogSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var h: FileHandle?
+    private let secret: String?
+
+    init(url: URL, fresh: Bool, header: String, secret: String?) {
+        self.secret = (secret?.isEmpty ?? true) ? nil : secret
+        let fm = FileManager.default
+        try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if fresh || !fm.fileExists(atPath: url.path) {
+            fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        h = try? FileHandle(forWritingTo: url)
+        if fresh { try? h?.truncate(atOffset: 0) }
+        _ = try? h?.seekToEnd()
+        write(header)
+    }
+
+    func write(_ text: String) {
+        var t = text
+        if let secret { t = t.replacingOccurrences(of: secret, with: "********") }
+        lock.lock(); defer { lock.unlock() }
+        h?.write(Data(t.utf8))
+    }
+
+    func close(_ footer: String) {
+        write(footer)
+        lock.lock(); defer { lock.unlock() }
+        try? h?.close(); h = nil
     }
 }

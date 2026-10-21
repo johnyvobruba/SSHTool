@@ -341,3 +341,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Výslovně zvolené zabezpečení (NLA/TLS/RDP) se nikdy nemění.
 - Editor RDP: přepínač „Automaticky najít kompatibilní režim“ a tlačítko „Obnovit výchozí a detekovat znovu“.
 - Import serverů (JSON) zná pole `rdpAutoDetect`.
+
+## 0.26.4
+
+- RDP: výstup FreeRDP se ukládá do `~/Library/Logs/SSHTool/rdp-<název>.log` (každé připojení i kompatibilní pokusy, heslo se maskuje, soubor 0600).
+  - V editoru přepínač „Podrobný log (diagnostika)“ (`/log-level:DEBUG`) a tlačítko „Zobrazit log“; chybová hláška má také „Zobrazit log“.
+- RDP: relace v režimu „Dynamické“ startuje ve velikosti obrazovky Macu místo 1024 × 768.
+- RDP: tlačítko ⏏ pro odpojení u běžící relace v levém panelu.
+- RDP: nápověda klávesových zkratek FreeRDP (pravý ⇧ + Enter celá obrazovka, pravý ⇧ + D odpojit…) – při prvním RDP připojení a v editoru serveru.
+- Import serverů (JSON) zná pole `rdpDebugLog`.

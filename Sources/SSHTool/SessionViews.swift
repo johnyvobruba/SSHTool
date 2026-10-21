@@ -682,6 +682,20 @@ struct SessionEditor: View {
                 TextField("", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
                     .labelsHidden().font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)
             }
+            Toggle("Podrobný log (diagnostika)", isOn: $m.session.rdpDebugLog)
+            HStack {
+                Text(m.session.rdpDebugLog
+                     ? "Přidá /log-level:DEBUG. Log obsahuje uživatele, IP a název počítače – po diagnostice vypni."
+                     : "Výstup FreeRDP se ukládá do ~/Library/Logs/SSHTool (heslo se maskuje).")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Zobrazit log") { NSWorkspace.shared.open(FreeRDP.logURL(for: m.session)) }
+                    .disabled(!FileManager.default.fileExists(atPath: FreeRDP.logURL(for: m.session).path))
+            }
+            DisclosureGroup("Klávesové zkratky v okně RDP") {
+                Text(RDPLauncher.hotkeysText).font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if let bin = FreeRDP.binary {
                 Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
             } else {

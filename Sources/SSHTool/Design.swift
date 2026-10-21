@@ -229,6 +229,14 @@ struct SidebarSessionRow: View {
                 EnvBadge(tag: session.envTag)
                 ip.layoutPriority(1)
             }
+            if session.isRDP, RDPLauncher.shared.isRunning(session.id) {
+                Button { RDPLauncher.shared.disconnect(session.id) } label: {
+                    Image(systemName: "eject.fill").font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(UI.textTertiary)
+                .help("Odpojit RDP relaci")
+            }
             dot
             star
         }
