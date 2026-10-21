@@ -311,6 +311,7 @@ struct ServerContextMenu: View {
 
     @ViewBuilder private var rdpMenu: some View {
         Button("Připojit (RDP)") { RDPLauncher.shared.launch(session) }
+        Button("Připojit se sdílenou složkou…") { RDPLauncher.shared.launchWithFolderPicker(session) }
         if RDPLauncher.shared.isRunning(session.id) {
             Button("Odpojit") { RDPLauncher.shared.disconnect(session.id) }
         }
@@ -621,6 +622,14 @@ struct SessionEditor: View {
         })
     }
 
+    private func addSharedFolders() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.allowsMultipleSelection = true
+        p.prompt = "Sdílet"; p.message = "Vyber složky, které budou dostupné v RDP relaci"
+        guard p.runModal() == .OK else { return }
+        for u in p.urls where !m.session.rdpFolders.contains(u.path) { m.session.rdpFolders.append(u.path) }
+    }
+
     @ViewBuilder private var rdpSections: some View {
         Section("Přihlášení") {
             SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
@@ -639,11 +648,45 @@ struct SessionEditor: View {
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)
+            Toggle("Levý ⌘ jako Ctrl (⌘C, ⌘V, ⌘A… ve Windows)", isOn: $m.session.rdpMacKeys)
+            if m.session.rdpMacKeys {
+                Text("Pravý ⌘ zůstává klávesou Windows. ⌘Tab dál přepíná aplikace na Macu.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("Sdílet domovskou složku Macu do relace", isOn: $m.session.rdpShareHome)
             if m.session.rdpShareHome {
                 Label("Vzdálený server (a kdokoli s přístupem k relaci) uvidí soubory ve tvé domovské složce.",
                       systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
             }
+        }
+        Section("Sdílené složky") {
+            ForEach(m.session.rdpFolders, id: \.self) { path in
+                HStack {
+                    Image(systemName: FileManager.default.fileExists(atPath: path) ? "folder" : "questionmark.folder")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(URL(fileURLWithPath: path).lastPathComponent)
+                        Text((path as NSString).abbreviatingWithTildeInPath)
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer()
+                    Button { m.session.rdpFolders.removeAll { $0 == path } } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless).help("Přestat sdílet")
+                }
+            }
+            Button("Přidat složku…") { addSharedFolders() }
+            Toggle("Při každém připojení vybrat složku ve Finderu", isOn: $m.session.rdpAskFolder)
+            Text("Jednorázově: pravé tlačítko na serveru → „Připojit se sdílenou složkou…“. Takto vybrané složky se neukládají.")
+                .font(.caption).foregroundStyle(.secondary)
+            if m.session.rdpFolders.isEmpty {
+                Text("Vybrané složky Macu se ve Windows objeví v Průzkumníku jako „\\\\tsclient\\<název>“ (Tento počítač → Přesměrované jednotky).")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Label("Server i kdokoli s přístupem k relaci může v těchto složkách číst, měnit a mazat soubory. Sdílej jen to, co je potřeba.",
+                      systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
+            }
+        }
+        Section("Brána a certifikát") {
             TextField("RD Gateway", text: $m.session.rdpGateway, prompt: Text("gw.example.com (volitelné)"))
             Picker("Certifikát serveru", selection: $m.session.rdpCertPolicy) {
                 Text("Zeptat se při neznámém / změněném").tag("")

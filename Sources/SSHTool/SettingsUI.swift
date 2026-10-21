@@ -907,6 +907,9 @@ struct SettingsServersPane: View {
         ("rdpGfx, rdpUDP", "ne", "RDP: true/false – grafický kanál GFX, UDP multitransport"),
         ("rdpAutoDetect", "ne", "RDP: true/false – automaticky najít kompatibilní režim (výchozí true)"),
         ("rdpDebugLog", "ne", "RDP: true/false – podrobný log FreeRDP (diagnostika)"),
+        ("rdpFolders", "ne", "RDP: pole cest ke sdíleným složkám, např. [\"/Users/jan/RDP\"]"),
+        ("rdpMacKeys", "ne", "RDP: true/false – levý ⌘ jako Ctrl (výchozí true)"),
+        ("rdpAskFolder", "ne", "RDP: true/false – při každém připojení vybrat sdílenou složku ve Finderu"),
     ]
 
     var body: some View {

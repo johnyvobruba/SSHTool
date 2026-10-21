@@ -376,3 +376,15 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
     a zobrazí se ruční postup.
   - Build: `chmod -R u+w` na celou aplikaci před podpisem.
 - RDP: před spuštěním přibalené `SSHTool-RDP.app` se zkontroluje a odstraní karanténa; když to nejde, srozumitelná hláška s příkazy místo „Not Opened“.
+
+## 0.26.8
+
+- RDP: **sdílené složky** – v editoru serveru sekce „Sdílené složky“, kde lze vybrat libovolné složky Macu
+  (`/drive:<název>,<cesta>`). Ve Windows se objeví jako `\\tsclient\<název>`. Neexistující složky se přeskočí,
+  stejné názvy se rozliší příponou. Varování, že server může soubory číst i měnit.
+- Editor RDP: RD Gateway a certifikát v samostatné sekci „Brána a certifikát“.
+- RDP: **výběr složky ve Finderu při připojení** – pravé tlačítko na serveru → „Připojit se sdílenou složkou…“
+  (jen pro tuto relaci, neukládá se), nebo přepínač „Při každém připojení vybrat složku ve Finderu“.
+- RDP: **⌘C / ⌘V ve Windows** – levý ⌘ se posílá jako Ctrl (`/kbd:remap:0x15b=0x1d`), přepínač
+  „Levý ⌘ jako Ctrl“ (výchozí zapnuto). Pravý ⌘ zůstává klávesou Windows.
+- Import serverů (JSON) zná pole `rdpFolders`, `rdpAskFolder`, `rdpMacKeys`.

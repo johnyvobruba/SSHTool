@@ -51,6 +51,25 @@ enum FreeRDP {
             .appendingPathComponent("rdp-\(safe.isEmpty ? s.id.uuidString : safe).log")
     }
 
+    /// Vybrané sdílené složky jako (název ve Windows, cesta). Neexistující se přeskočí, názvy jsou unikátní.
+    static func sharedFolders(_ s: SSHSession) -> [(String, String)] {
+        var used: Set<String> = s.rdpShareHome ? ["home"] : []
+        var out: [(String, String)] = []
+        for path in s.rdpFolders {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { continue }
+            // název disku: poslední část cesty, bez čárek (oddělovač argumentu) a zpětných lomítek
+            var base = URL(fileURLWithPath: path).lastPathComponent
+                .replacingOccurrences(of: ",", with: "_").replacingOccurrences(of: "\\", with: "_")
+            if base.isEmpty || base == "/" { base = "Mac" }
+            var name = base, n = 2
+            while used.contains(name.lowercased()) { name = "\(base)-\(n)"; n += 1 }
+            used.insert(name.lowercased())
+            out.append((name, path))
+        }
+        return out
+    }
+
     /// Argumenty pro FreeRDP (bez hesla).
     @MainActor static func arguments(_ s: SSHSession) -> [String] {
         let host = s.host.contains(":") && !s.host.hasPrefix("[") ? "[\(s.host)]" : s.host
@@ -65,8 +84,11 @@ enum FreeRDP {
         default: a.append("/size:\(s.rdpSize)")
         }
         if s.rdpMultiMon { a.append("/multimon") }
+        // levý ⌘ (RDP scancode LWin 0x15B) → levý Ctrl (0x1D); ruční /kbd v Dalších argumentech má přednost
+        if s.rdpMacKeys, !s.rdpExtraArgs.contains("/kbd:") { a.append("/kbd:remap:0x15b=0x1d") }
         a.append(s.rdpClipboard ? "+clipboard" : "-clipboard")
         if s.rdpShareHome { a.append("/drive:Home,\(NSHomeDirectory())") }
+        for (name, path) in sharedFolders(s) { a.append("/drive:\(name),\(path)") }
         if !s.rdpGateway.isEmpty { a.append("/g:\(s.rdpGateway)") }
         if s.rdpCertPolicy == "tofu" { a.append("/cert:tofu") }      // „ignore“ se záměrně nenabízí
         if !s.rdpSecurity.isEmpty { a.append("/sec:\(s.rdpSecurity)") }
@@ -98,7 +120,29 @@ final class RDPLauncher: ObservableObject {
 
     func isRunning(_ id: UUID) -> Bool { running[id] != nil }
 
+    /// Finder: výběr složek ke sdílení jen pro toto připojení. nil = uživatel zrušil celé připojení.
+    static func pickFolders(for s: SSHSession) -> [String]? {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.allowsMultipleSelection = true
+        p.canCreateDirectories = true
+        p.prompt = "Sdílet a připojit"
+        p.message = "Složky Macu, které budou v relaci „\(s.name)“ dostupné jako \\\\tsclient\\<název>"
+        p.directoryURL = URL(fileURLWithPath: s.rdpFolders.last ?? NSHomeDirectory())
+        guard p.runModal() == .OK else { return nil }
+        return p.urls.map(\.path)
+    }
+
+    /// Připojení se složkami vybranými ve Finderu (jen pro tuto relaci, do serveru se neukládají).
+    func launchWithFolderPicker(_ s: SSHSession) {
+        guard let picked = Self.pickFolders(for: s) else { return }
+        var t = s
+        t.rdpFolders += picked.filter { !t.rdpFolders.contains($0) }
+        t.rdpAskFolder = false
+        launch(t)
+    }
+
     func launch(_ s: SSHSession) {
+        if s.rdpAskFolder { launchWithFolderPicker(s); return }
         if let p = running[s.id], p.isRunning {
             let a = NSAlert()
             a.messageText = "RDP relace „\(s.name)“ už běží"
