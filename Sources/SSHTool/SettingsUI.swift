@@ -908,6 +908,7 @@ struct SettingsServersPane: View {
         ("rdpAutoDetect", "ne", "RDP: true/false – automaticky najít kompatibilní režim (výchozí true)"),
         ("rdpDebugLog", "ne", "RDP: true/false – podrobný log FreeRDP (diagnostika)"),
         ("rdpFolders", "ne", "RDP: pole cest ke sdíleným složkám, např. [\"/Users/jan/RDP\"]"),
+        ("rdpScale", "ne", "RDP: měřítko ve Windows v % (0 = automaticky, 100–200)"),
         ("rdpMacKeys", "ne", "RDP: true/false – levý ⌘ jako Ctrl (výchozí true)"),
         ("rdpAskFolder", "ne", "RDP: true/false – při každém připojení vybrat sdílenou složku ve Finderu"),
     ]

@@ -70,6 +70,14 @@ enum FreeRDP {
         return out
     }
 
+    /// Měřítko Windows plochy. Automaticky: celá obrazovka na Retině 150 %, jinak 100 % (bez parametru).
+    /// Dynamický režim posílá velikost v bodech – tam by vyšší měřítko vše ještě zvětšilo.
+    @MainActor static func scale(for s: SSHSession) -> Int? {
+        if s.rdpScale > 0 { return s.rdpScale == 100 ? nil : s.rdpScale }
+        guard s.rdpSize == "fullscreen", (NSScreen.main?.backingScaleFactor ?? 1) >= 2 else { return nil }
+        return 150
+    }
+
     /// Argumenty pro FreeRDP (bez hesla).
     @MainActor static func arguments(_ s: SSHSession) -> [String] {
         let host = s.host.contains(":") && !s.host.hasPrefix("[") ? "[\(s.host)]" : s.host
@@ -83,6 +91,7 @@ enum FreeRDP {
             if let size = initialSize { a.append("/size:\(size)") }
         default: a.append("/size:\(s.rdpSize)")
         }
+        if let scale = scale(for: s), !s.rdpExtraArgs.contains("/scale-desktop") { a.append("/scale-desktop:\(scale)") }
         if s.rdpMultiMon { a.append("/multimon") }
         // levý ⌘ (RDP scancode LWin 0x15B) → levý Ctrl (0x1D); ruční /kbd v Dalších argumentech má přednost
         if s.rdpMacKeys, !s.rdpExtraArgs.contains("/kbd:") { a.append("/kbd:remap:0x15b=0x1d") }

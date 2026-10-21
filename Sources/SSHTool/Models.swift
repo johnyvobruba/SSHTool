@@ -49,6 +49,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var rdpClipboard = true
     var rdpShareHome = false            // přesměrování domovské složky Macu do RDP relace
     var rdpFolders: [String] = []       // vybrané složky Macu sdílené do relace (\\tsclient\<název>)
+    var rdpScale = 0                    // měřítko (DPI) ve Windows v %: 0 = automaticky, jinak 100–200
     var rdpMacKeys = true               // levý ⌘ → Ctrl (⌘C/⌘V/⌘A… ve Windows)
     var rdpAskFolder = false            // při každém připojení se zeptat (Finder), kterou složku sdílet
     var rdpCertPolicy = ""              // "" = zeptat se, "tofu" = důvěřovat při prvním připojení
@@ -75,7 +76,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
-             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpCertPolicy, rdpExtraArgs,
+             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpCertPolicy, rdpExtraArgs,
              rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
 
@@ -594,6 +595,8 @@ extension SSHSession {
         rdpFolders = try c.decodeIfPresent([String].self, forKey: .rdpFolders) ?? []
         rdpAskFolder = try c.decodeIfPresent(Bool.self, forKey: .rdpAskFolder) ?? false
         rdpMacKeys = try c.decodeIfPresent(Bool.self, forKey: .rdpMacKeys) ?? true
+        let sc = try c.decodeIfPresent(Int.self, forKey: .rdpScale) ?? 0
+        rdpScale = (100...300).contains(sc) ? sc : 0
         rdpCertPolicy = (try c.decodeIfPresent(String.self, forKey: .rdpCertPolicy)) == "tofu" ? "tofu" : ""
         rdpExtraArgs = try c.decodeIfPresent(String.self, forKey: .rdpExtraArgs) ?? ""
         let sec = try c.decodeIfPresent(String.self, forKey: .rdpSecurity) ?? ""

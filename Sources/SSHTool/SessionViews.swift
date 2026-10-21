@@ -646,6 +646,16 @@ struct SessionEditor: View {
                 Text("1440 × 900").tag("1440x900")
                 Text("1280 × 800").tag("1280x800")
             }
+            Picker("Měřítko ve Windows", selection: $m.session.rdpScale) {
+                Text("Automaticky").tag(0)
+                Text("100 %").tag(100)
+                Text("125 %").tag(125)
+                Text("150 %").tag(150)
+                Text("175 %").tag(175)
+                Text("200 %").tag(200)
+            }
+            Text("Velikost písma a ovládacích prvků ve Windows. Automaticky: celá obrazovka na Retině 150 %, jinak 100 %.")
+                .font(.caption).foregroundStyle(.secondary)
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)
             Toggle("Levý ⌘ jako Ctrl (⌘C, ⌘V, ⌘A… ve Windows)", isOn: $m.session.rdpMacKeys)

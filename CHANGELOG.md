@@ -388,3 +388,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - RDP: **⌘C / ⌘V ve Windows** – levý ⌘ se posílá jako Ctrl (`/kbd:remap:0x15b=0x1d`), přepínač
   „Levý ⌘ jako Ctrl“ (výchozí zapnuto). Pravý ⌘ zůstává klávesou Windows.
 - Import serverů (JSON) zná pole `rdpFolders`, `rdpAskFolder`, `rdpMacKeys`.
+
+## 0.26.9
+
+- RDP: **měřítko ve Windows** (`/scale-desktop`) – Automaticky / 100–200 % v editoru serveru.
+  Automaticky: celá obrazovka na Retině 150 % (ostré a čitelné místo drobného), jinak beze změny.
+  Ruční `/scale-desktop` v Dalších argumentech má přednost.
+- Import serverů (JSON) zná pole `rdpScale`.
