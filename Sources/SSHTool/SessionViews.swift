@@ -18,6 +18,7 @@ final class SessionEditorModel: ObservableObject {
     @Published var showGroups = false
     @Published var groupQuery = ""
     @Published var advanced = false
+    @Published var rdpAdvanced = false
     @Published var authMore = false
     init(_ session: SSHSession) {
         self.session = session
@@ -644,6 +645,13 @@ struct SessionEditor: View {
         for u in p.urls where !m.session.rdpFolders.contains(u.path) { m.session.rdpFolders.append(u.path) }
     }
 
+    /// Pokročilé RDP nastavení se liší od výchozího (zobrazí se v nadpisu sbalené sekce).
+    private var rdpAdvancedChanged: Bool {
+        let x = m.session
+        return !x.rdpSecurity.isEmpty || x.rdpBpp != 0 || !x.rdpGfx || !x.rdpUDP || !x.rdpAutoDetect
+            || !x.rdpExtraArgs.isEmpty || x.rdpDebugLog
+    }
+
     @ViewBuilder private var rdpSections: some View {
         Section("Přihlášení") {
             SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
@@ -651,7 +659,7 @@ struct SessionEditor: View {
             Text("Heslo je jen v Klíčence macOS a FreeRDP ho dostane přes stdin (není vidět v seznamu procesů). Bez uloženého hesla se zeptá okno FreeRDP.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        Section("RDP") {
+        Section("Zobrazení") {
             Picker("Rozlišení", selection: $m.session.rdpSize) {
                 Text("Dynamické (podle okna)").tag("dynamic")
                 Text("Celá obrazovka").tag("fullscreen")
@@ -685,19 +693,25 @@ struct SessionEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
+        }
+        Section("Klávesnice a schránka") {
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)
             Toggle("Levý ⌘ jako Ctrl (⌘C, ⌘V, ⌘A… ve Windows)", isOn: $m.session.rdpMacKeys)
             if m.session.rdpMacKeys {
                 Text("Pravý ⌘ zůstává klávesou Windows. ⌘Tab dál přepíná aplikace na Macu.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            DisclosureGroup("Klávesové zkratky v okně RDP") {
+                Text(RDPLauncher.hotkeysText).font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        Section("Složky") {
             Toggle("Sdílet domovskou složku Macu do relace", isOn: $m.session.rdpShareHome)
             if m.session.rdpShareHome {
                 Label("Vzdálený server (a kdokoli s přístupem k relaci) uvidí soubory ve tvé domovské složce.",
                       systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
             }
-        }
-        Section("Sdílené složky") {
             ForEach(m.session.rdpFolders, id: \.self) { path in
                 HStack {
                     Image(systemName: FileManager.default.fileExists(atPath: path) ? "folder" : "questionmark.folder")
@@ -731,57 +745,63 @@ struct SessionEditor: View {
                 Text("Důvěřovat při prvním připojení (TOFU)").tag("tofu")
             }
         }
-        Section("Zabezpečení a kompatibilita") {
-            Picker("Zabezpečení", selection: $m.session.rdpSecurity) {
-                Text("Automaticky").tag("")
-                Text("NLA (doporučeno)").tag("nla")
-                Text("TLS (bez NLA)").tag("tls")
-                Text("RDP (starší, nešifrované ověření)").tag("rdp")
-            }
-            if m.session.rdpSecurity == "tls" || m.session.rdpSecurity == "rdp" {
-                Label("Bez NLA server ukáže přihlášení ještě před ověřením uživatele. Používej jen tam, kde NLA nefunguje.",
-                      systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
-            }
-            Picker("Barevná hloubka", selection: $m.session.rdpBpp) {
-                Text("Výchozí (32 bit)").tag(0)
-                Text("24 bit").tag(24)
-                Text("16 bit").tag(16)
-            }
-            Toggle("Grafický kanál GFX (H.264)", isOn: $m.session.rdpGfx)
-            Toggle("UDP multitransport", isOn: $m.session.rdpUDP)
-            Toggle("Automaticky najít kompatibilní režim", isOn: $m.session.rdpAutoDetect)
-            Text("Když se relace hned po otevření ukončí (TRANSPORT_FAILED), SSHTool to zkusí znovu bez GFX a UDP s 24 bity a funkční nastavení uloží sem. Přechod na TLS bez NLA vždy potvrzuješ ty. Výslovně zvolené zabezpečení se nemění.")
-                .font(.caption).foregroundStyle(.secondary)
-            if !m.session.rdpGfx || !m.session.rdpUDP || m.session.rdpBpp != 0 || !m.session.rdpSecurity.isEmpty {
-                Button("Obnovit výchozí a detekovat znovu") {
-                    m.session.rdpGfx = true; m.session.rdpUDP = true
-                    m.session.rdpBpp = 0; m.session.rdpSecurity = ""
-                    m.session.rdpAutoDetect = true
+        Section {
+            DisclosureGroup(isExpanded: $m.rdpAdvanced) {
+                Picker("Zabezpečení", selection: $m.session.rdpSecurity) {
+                    Text("Automaticky").tag("")
+                    Text("NLA (doporučeno)").tag("nla")
+                    Text("TLS (bez NLA)").tag("tls")
+                    Text("RDP (starší, nešifrované ověření)").tag("rdp")
                 }
-            }
-            LabeledContent("Další argumenty FreeRDP") {
-                TextField("", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
-                    .labelsHidden().font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)
-            }
-            Toggle("Podrobný log (diagnostika)", isOn: $m.session.rdpDebugLog)
-            HStack {
-                Text(m.session.rdpDebugLog
-                     ? "Přidá /log-level:DEBUG. Log obsahuje uživatele, IP a název počítače – po diagnostice vypni."
-                     : "Výstup FreeRDP se ukládá do ~/Library/Logs/SSHTool (heslo se maskuje).")
+                if m.session.rdpSecurity == "tls" || m.session.rdpSecurity == "rdp" {
+                    Label("Bez NLA server ukáže přihlášení ještě před ověřením uživatele. Používej jen tam, kde NLA nefunguje.",
+                          systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
+                }
+                Picker("Barevná hloubka", selection: $m.session.rdpBpp) {
+                    Text("Výchozí (32 bit)").tag(0)
+                    Text("24 bit").tag(24)
+                    Text("16 bit").tag(16)
+                }
+                Toggle("Grafický kanál GFX (H.264)", isOn: $m.session.rdpGfx)
+                Toggle("UDP multitransport", isOn: $m.session.rdpUDP)
+                Toggle("Automaticky najít kompatibilní režim", isOn: $m.session.rdpAutoDetect)
+                Text("Když se relace hned po otevření ukončí (TRANSPORT_FAILED), SSHTool to zkusí znovu bez GFX a UDP s 24 bity a funkční nastavení uloží sem. Přechod na TLS bez NLA vždy potvrzuješ ty. Výslovně zvolené zabezpečení se nemění.")
                     .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Zobrazit log") { NSWorkspace.shared.open(FreeRDP.logURL(for: m.session)) }
-                    .disabled(!FileManager.default.fileExists(atPath: FreeRDP.logURL(for: m.session).path))
-            }
-            DisclosureGroup("Klávesové zkratky v okně RDP") {
-                Text(RDPLauncher.hotkeysText).font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if let bin = FreeRDP.binary {
-                Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
-            } else {
-                Label("FreeRDP nenalezen – nainstaluj: brew install freerdp", systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(Color.orange)
+                if !m.session.rdpGfx || !m.session.rdpUDP || m.session.rdpBpp != 0 || !m.session.rdpSecurity.isEmpty {
+                    Button("Obnovit výchozí a detekovat znovu") {
+                        m.session.rdpGfx = true; m.session.rdpUDP = true
+                        m.session.rdpBpp = 0; m.session.rdpSecurity = ""
+                        m.session.rdpAutoDetect = true
+                    }
+                }
+                LabeledContent("Další argumenty FreeRDP") {
+                    TextField("", text: $m.session.rdpExtraArgs, prompt: Text("/network:auto /sound"))
+                        .labelsHidden().font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)
+                }
+                Toggle("Podrobný log (diagnostika)", isOn: $m.session.rdpDebugLog)
+                HStack {
+                    Text(m.session.rdpDebugLog
+                         ? "Přidá /log-level:DEBUG. Log obsahuje uživatele, IP a název počítače – po diagnostice vypni."
+                         : "Výstup FreeRDP se ukládá do ~/Library/Logs/SSHTool (heslo se maskuje).")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Zobrazit log") { NSWorkspace.shared.open(FreeRDP.logURL(for: m.session)) }
+                        .disabled(!FileManager.default.fileExists(atPath: FreeRDP.logURL(for: m.session).path))
+                }
+                if let bin = FreeRDP.binary {
+                    Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
+                } else {
+                    Label("FreeRDP nenalezen – nainstaluj: brew install freerdp", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(Color.orange)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Pokročilé – zabezpečení, kompatibilita, diagnostika")
+                    if rdpAdvancedChanged {
+                        Text("upraveno").font(.caption).padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Capsule().fill(Color.orange.opacity(0.2))).foregroundStyle(Color.orange)
+                    }
+                }
             }
         }
     }

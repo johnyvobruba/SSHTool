@@ -411,3 +411,11 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   a běžící relace se přepojí (FreeRDP neumí měřítko změnit bez přepojení).
 - Automatické přepojení se znovu neptá na potvrzení PROD (už bylo potvrzeno).
 - Import serverů (JSON) zná pole `rdpMonitor`, `rdpAutoMonitor`.
+
+## 0.26.11
+
+- Editor RDP serveru přeuspořádaný podle Windows App: Přihlášení · Zobrazení · Klávesnice a schránka · Složky ·
+  Brána a certifikát · **Pokročilé** (sbalené).
+- Sekce „Pokročilé – zabezpečení, kompatibilita, diagnostika“ (zabezpečení, barevná hloubka, GFX, UDP,
+  automatická detekce, další argumenty, podrobný log, cesta k FreeRDP) je ve výchozím stavu skrytá a rozbalí se
+  šipkou. Když se nastavení liší od výchozího, nadpis ukazuje štítek „upraveno“.
