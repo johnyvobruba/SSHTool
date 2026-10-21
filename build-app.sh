@@ -56,7 +56,8 @@ if [[ "${BUNDLE_FREERDP:-auto}" != "0" ]]; then
     done
     # dylibbundler zkopíruje závislé knihovny a přepíše cesty na @executable_path/lib/
     dylibbundler -of -b -x "$H/sdl-freerdp" -d "$H/lib" -p @executable_path/lib/ "${SEARCH[@]}" </dev/null >/dev/null
-    ls "$H/lib" > "$H/BUNDLED-LIBS.txt"
+    # seznam knihoven do Resources – v Contents/Helpers smí být jen podepsaný kód (jinak codesign selže)
+    ls "$H/lib" > "$APP/Contents/Resources/FreeRDP-BUNDLED-LIBS.txt"
     for f in "$H/lib/"*.dylib "$H/sdl-freerdp"; do codesign --force --sign "$IDENTITY" "$f" 2>/dev/null; done
     echo "  $(ls "$H/lib" | wc -l | tr -d ' ') knihoven, $(du -sh "$H" | cut -f1)"
   elif [[ "${BUNDLE_FREERDP:-auto}" == "1" ]]; then
