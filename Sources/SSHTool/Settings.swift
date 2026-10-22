@@ -26,6 +26,7 @@ struct AppSettings: Codable, Equatable {
     var showFavorites = true
     var disabledRuleGroups: [String] = [] // vypnuté skupiny pravidel zvýraznění
     var logMaxMB = 0                      // 0 = bez limitu, jinak rotace logu po N MB
+    var logRetentionDays = 30             // logy starší než N dní se při spuštění smažou (0 = neomezeně)
     var optionAsMeta = false              // false: ⌥ píše znaky macOS (⌥2 = @), true: ⌥ = Meta/Esc
     var groupColors: [String: String] = [:]   // ruční barvy skupin (jinak automatická z názvu)
     var focusShowStatus = true            // režim soustředění: ponechat stavový řádek
@@ -50,7 +51,7 @@ struct AppSettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case copyOnSelect, rightClickPaste, logEnabled, logDirectory, logPlainText, scrollback, fontSize, serialBaud, collapsedGroups,
              fontName, lineSpacing, highlightEnabled, sidebarComfortable, latencyEnabled,
-             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders, freerdpPath
+             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, logRetentionDays, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders, freerdpPath
     }
 
     var logDirectoryURL: URL {
@@ -83,6 +84,8 @@ extension AppSettings {
         showFavorites = try c.decodeIfPresent(Bool.self, forKey: .showFavorites) ?? d.showFavorites
         disabledRuleGroups = try c.decodeIfPresent([String].self, forKey: .disabledRuleGroups) ?? d.disabledRuleGroups
         logMaxMB = try c.decodeIfPresent(Int.self, forKey: .logMaxMB) ?? d.logMaxMB
+        let keep = try c.decodeIfPresent(Int.self, forKey: .logRetentionDays) ?? d.logRetentionDays
+        logRetentionDays = max(0, keep)
         optionAsMeta = try c.decodeIfPresent(Bool.self, forKey: .optionAsMeta) ?? d.optionAsMeta
         groupColors = try c.decodeIfPresent([String: String].self, forKey: .groupColors) ?? d.groupColors
         focusShowStatus = try c.decodeIfPresent(Bool.self, forKey: .focusShowStatus) ?? d.focusShowStatus
@@ -265,3 +268,47 @@ final class SessionLogger: @unchecked Sendable {
 }
 
 // Okno nastavení: viz SettingsUI.swift
+
+/// Retence logů: při spuštění smaže logy starší než nastavený počet dní.
+/// Maže jen soubory, které vytvořil SSHTool (podle názvu), nic jiného ve složce logů.
+enum LogRetention {
+    static func prune(_ settings: AppSettings) {
+        let days = settings.logRetentionDays
+        guard days > 0 else { return }
+        let limit = Date().addingTimeInterval(-Double(days) * 86_400)
+        let fm = FileManager.default
+        func old(_ url: URL) -> Bool {
+            let d = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            return (d ?? Date()) < limit
+        }
+        // 1) logy relací: RRRR-MM-DD_HH-MM-SS_<server>[_sftp|_local][_partN].log
+        let sessionRe = #"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_.+\.log$"#
+        if let items = try? fm.contentsOfDirectory(at: settings.logDirectoryURL, includingPropertiesForKeys: [.contentModificationDateKey]) {
+            for u in items where u.lastPathComponent.range(of: sessionRe, options: .regularExpression) != nil && old(u) {
+                try? fm.removeItem(at: u)
+            }
+        }
+        // 2) RDP logy: ~/Library/Logs/SSHTool/rdp-*.log
+        let logs = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/SSHTool", isDirectory: true)
+        if let items = try? fm.contentsOfDirectory(at: logs, includingPropertiesForKeys: [.contentModificationDateKey]) {
+            for u in items where u.lastPathComponent.hasPrefix("rdp-") && u.pathExtension == "log" && old(u) {
+                try? fm.removeItem(at: u)
+            }
+        }
+        // 3) multisend.log: jeden soubor – ponechat jen záznamy mladší než limit (bloky „===== <ISO8601>“)
+        let ms = logs.appendingPathComponent("multisend.log")
+        guard let text = try? String(contentsOf: ms, encoding: .utf8) else { return }
+        let iso = ISO8601DateFormatter()
+        var kept: [String] = []
+        for block in text.components(separatedBy: "===== ").dropFirst() {
+            let stamp = String(block.prefix(while: { !$0.isWhitespace && $0 != "(" }))
+            if let d = iso.date(from: stamp), d < limit { continue }
+            kept.append("===== " + block)
+        }
+        let out = kept.joined()
+        if out.count != text.count {
+            try? out.write(to: ms, atomically: true, encoding: .utf8)
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ms.path)
+        }
+    }
+}

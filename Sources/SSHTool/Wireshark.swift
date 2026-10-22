@@ -167,7 +167,7 @@ extension TabManager {
             guard let fh = try? FileHandle(forWritingTo: local) else { return }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-            p.arguments = ["-S", cp, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", dest, "\(sudo)cat \(remotePath)"]
+            p.arguments = ["-S", cp, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", "--", dest, "\(sudo)cat \(remotePath)"]
             p.standardInput = FileHandle.nullDevice
             p.standardOutput = fh
             let err = Pipe(); p.standardError = err

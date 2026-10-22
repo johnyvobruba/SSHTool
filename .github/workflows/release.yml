@@ -69,6 +69,16 @@ jobs:
           V=${{ steps.v.outputs.version }}
           awk -v v="## $V" 'index($0, v)==1 {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md || true
           [ -s notes.md ] || echo "SSHTool $V" > notes.md
+          if [ -f build/FreeRDP-VERSIONS.txt ]; then
+            {
+              echo
+              echo "### Přibalené závislosti RDP"
+              echo '```'
+              cat build/FreeRDP-VERSIONS.txt
+              echo '```'
+              echo "Bezpečnostní oznámení FreeRDP: https://github.com/FreeRDP/FreeRDP/security/advisories"
+            } >> notes.md
+          fi
           cat notes.md
 
       - name: GitHub Release

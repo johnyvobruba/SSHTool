@@ -791,9 +791,13 @@ struct SettingsLoggingPane: View {
                              options: [(0, "Bez limitu"), (10, "Po 10 MB"), (50, "Po 50 MB"), (100, "Po 100 MB"), (500, "Po 500 MB")],
                              width: 180)
             }
-            SKRow("Retence", help: "Aplikace staré logy nemaže. Retenci řeš politikou úložiště / zálohování.") { EmptyView() }
+            SKRow("Retence", help: "Při spuštění aplikace smaže starší logy relací, RDP logy a záznamy auditu odeslaných příkazů. Maže jen soubory vytvořené SSHToolem.") {
+                SKMenuPicker(selection: $store.settings.logRetentionDays,
+                             options: [(7, "7 dní"), (30, "30 dní"), (90, "90 dní"), (365, "1 rok"), (0, "Neomezeně")],
+                             width: 180)
+            }
         }
-        Label("Log obsahuje vše, co server vypsal (konfigurace, případně citlivé údaje). Složka má práva 700.",
+        Label("Log obsahuje vše, co server vypsal i co bylo vidět na obrazovce (konfigurace, hashe hesel, tokeny). Soubory mají práva 600, složka 700; přesto je neukládej na sdílená ani synchronizovaná místa (iCloud, OneDrive) a po skončení práce je zvaž smazat. Stejné platí pro audit odeslaných příkazů a podrobný log FreeRDP v ~/Library/Logs/SSHTool.",
               systemImage: "exclamationmark.shield")
             .font(SK.helpFont).foregroundStyle(UI.connecting)
     }

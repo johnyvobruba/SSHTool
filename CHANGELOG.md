@@ -466,3 +466,14 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Spouštěné procesy (ssh, FreeRDP, sftp, lokální terminál…) nedostávají proměnné `DYLD_*` z prostředí aplikace.
 - `~/Library/Application Support/SSHTool` má práva 0700, `sessions.json` a ostatní soubory 0600.
 - Import pravidel zvýraznění vynechá regulární výrazy s vnořenými kvantifikátory (`(a+)+`, `(.*)*`) a delší než 500 znaků.
+
+## 0.27.4
+
+- **Retence logů:** při spuštění se mažou logy starší než 30 dní (nastavitelné 7 / 30 / 90 / 365 dní / neomezeně
+  v Nastavení → Logování) – logy relací, RDP logy a záznamy v auditu odeslaných příkazů. Mažou se jen soubory
+  vytvořené SSHToolem. Rozšířené upozornění na citlivý obsah logů.
+- **Přibalené závislosti RDP:** verze FreeRDP, OpenSSL, FFmpeg, SDL… se při buildu zapíší do aplikace
+  (editor RDP → Pokročilé → „Verze přibalených knihoven…“) a do poznámek k vydání.
+- **Sledování CVE FreeRDP:** GitHub Action jednou týdně kontroluje bezpečnostní oznámení FreeRDP a při novém
+  založí issue v repozitáři.
+- Wireshark (stažení odchytu): `--` před cílem ssh.

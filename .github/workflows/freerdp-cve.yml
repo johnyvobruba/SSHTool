@@ -1,0 +1,38 @@
+name: Kontrola zranitelností FreeRDP
+
+# Jednou týdně projde bezpečnostní oznámení FreeRDP (GitHub Security Advisories) a když za posledních 8 dní
+# vyšlo nové, založí v tomto repozitáři issue. Oprava = nové vydání SSHTool (CI přibalí aktuální FreeRDP z Homebrew).
+on:
+  schedule:
+    - cron: "17 6 * * 1"        # pondělí 06:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nová oznámení FreeRDP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SINCE=$(date -u -d '8 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/FreeRDP/FreeRDP/security-advisories?per_page=50&sort=published&direction=desc" \
+            --jq ".[] | select(.published_at >= \"$SINCE\") | \"- [\(.severity)] \(.ghsa_id) \(.cve_id // \"\"): \(.summary) – \(.html_url)\"" > new.txt || true
+          if [ -s new.txt ]; then
+            {
+              echo "Nová bezpečnostní oznámení FreeRDP (od $SINCE):"
+              echo
+              cat new.txt
+              echo
+              echo "Přibalená verze je v poznámkách posledního vydání (sekce Přibalené závislosti RDP)."
+              echo "Pokud je přibalená verze zranitelná: počkat na opravu v Homebrew a vydat novou verzi SSHTool."
+            } > body.md
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "FreeRDP: nové bezpečnostní oznámení ($(date -u +%Y-%m-%d))" --body-file body.md
+          else
+            echo "Žádná nová oznámení."
+          fi

@@ -797,6 +797,10 @@ struct SessionEditor: View {
                     Button("Zobrazit log") { NSWorkspace.shared.open(FreeRDP.logURL(for: m.session)) }
                         .disabled(!FileManager.default.fileExists(atPath: FreeRDP.logURL(for: m.session).path))
                 }
+                if let v = Bundle.main.url(forResource: "FreeRDP-VERSIONS", withExtension: "txt") {
+                    Button("Verze přibalených knihoven…") { NSWorkspace.shared.open(v) }
+                        .help("Verze FreeRDP, OpenSSL, FFmpeg, SDL… – pro kontrolu známých zranitelností (CVE)")
+                }
                 if let bin = FreeRDP.binary {
                     Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
                 } else {

@@ -249,6 +249,8 @@ final class AppStore: ObservableObject {
         }
         settings = load("settings.json") ?? AppSettings()
         Prefs.current = settings
+        let snapshot = settings
+        DispatchQueue.global(qos: .utility).async { LogRetention.prune(snapshot) }   // retence logů
         GroupPalette.overrides = settings.groupColors
         snippets = load("snippets.json") ?? Snippet.defaults
         AppStore.shared = self
