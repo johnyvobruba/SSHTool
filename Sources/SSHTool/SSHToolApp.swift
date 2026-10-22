@@ -73,6 +73,8 @@ struct SSHToolApp: App {
             CommandMenu("Terminál") {
                 Button("Broadcast vstupu do více relací…") { tabs.toggleBroadcast() }
                     .keyboardShortcut("i", modifiers: [.command, .shift])
+                Button("Odeslat příkazy do relací…") { tabs.showMultiSend = true }
+                    .keyboardShortcut("i", modifiers: [.command, .option])
                 Button("Soubory serveru (SFTP)") { tabs.toggleFiles() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
                     .disabled(tabs.selected == nil)

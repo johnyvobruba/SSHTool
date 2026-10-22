@@ -808,7 +808,7 @@ struct SettingsShortcutsPane: View {
                      ("⇧⌘← / ⇧⌘→", "Posunout záložku"), ("⇧⌘R", "Znovu připojit"), ("⇧⌘L", "Logování záložky")]),
         ("Panely", [("⇧⌘D / ⌘D", "Rozdělit vedle / pod sebe"), ("⌥⌘← / ⌥⌘→", "Přepnout panel"), ("⌥⌘U", "Zrušit rozdělení")]),
         ("Terminál", [("⌘K", "Paleta příkazů"), ("⇧⌘K", "Rychlé připojení"), ("⌘F / ⌘G", "Hledat / další výskyt"),
-                      ("⌘L", "Vymazat obrazovku"), ("⌘R", "Znovu připojit odpojenou relaci"), ("⇧⌘I", "Broadcast"),
+                      ("⌘L", "Vymazat obrazovku"), ("⌘R", "Znovu připojit odpojenou relaci"), ("⇧⌘I", "Broadcast"), ("⌥⌘I", "Odeslat příkazy do relací"),
                       ("⌥⌘B", "Break (sériová konzole)"), ("⌘+ / ⌘− / ⌘0", "Velikost písma")]),
         ("Okno", [("⌃⌘S", "Levý panel"), ("⇧⌘N", "Lokální terminál"), ("⇧⌘S", "SFTP"), ("⇧⌘O", "Webové rozhraní"), ("⌘,", "Nastavení")]),
     ]

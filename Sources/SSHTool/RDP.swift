@@ -301,13 +301,16 @@ final class RDPLauncher: ObservableObject {
         p.executableURL = URL(fileURLWithPath: bin)
         // přibalený OpenSSL legacy provider (MD4 → NTLM → NLA bez domény)
         let binDir = URL(fileURLWithPath: bin).deletingLastPathComponent()
+        var env = ProcessInfo.processInfo.environment
         if let modules = [binDir.appendingPathComponent("../Frameworks/ossl-modules").standardized.path,
                           binDir.appendingPathComponent("ossl-modules").path]
             .first(where: { FileManager.default.fileExists(atPath: $0 + "/legacy.dylib") }) {
-            var env = ProcessInfo.processInfo.environment
             env["OPENSSL_MODULES"] = modules
-            p.environment = env
         }
+        // SDL: celá obrazovka bez nativních Spaces macOS – jinak při startu FreeRDP krátce vznikne
+        // a zanikne černý Space (zčerná a „odjede“ celá obrazovka) a přepínání pravý ⇧+Enter je pomalé.
+        env["SDL_VIDEO_MAC_FULLSCREEN_SPACES"] = "0"
+        p.environment = env
         let args = FreeRDP.arguments(s)
         p.arguments = password == nil ? args : ["/args-from:stdin"]
         let inPipe = Pipe(), errPipe = Pipe()

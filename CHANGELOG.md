@@ -419,3 +419,16 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Sekce „Pokročilé – zabezpečení, kompatibilita, diagnostika“ (zabezpečení, barevná hloubka, GFX, UDP,
   automatická detekce, další argumenty, podrobný log, cesta k FreeRDP) je ve výchozím stavu skrytá a rozbalí se
   šipkou. Když se nastavení liší od výchozího, nadpis ukazuje štítek „upraveno“.
+
+## 0.27.0
+
+- **Odeslat příkazy do relací** (Terminál → „Odeslat příkazy do relací…“, ⌥⌘I): jeden příkaz nebo sada příkazů
+  do vybraných aktivních SSH / sériových relací.
+  - Výběr cílů zaškrtnutím, rychlé volby Vše / Nic / Bez PROD / Jen složka; předvybrané jsou relace mimo PROD.
+  - Příkazy jeden na řádek, vložení ze snippetů, vynechání prázdných řádků a komentářů `#`.
+  - Řádky se posílají postupně s nastavitelnou prodlevou (výchozí 300 ms), lze zastavit; volitelně bez Enteru (jen vložit).
+  - Vždy potvrzení se seznamem cílů a příkazů, PRODUKČNÍ zařízení zvýrazněna.
+  - Auditní záznam každého odeslání: `~/Library/Logs/SSHTool/multisend.log` (0600).
+- RDP: odstraněno **bliknutí obrazovky při spuštění relace** – FreeRDP (SDL) při startu krátce vytvářel a rušil
+  černý Space (nativní celá obrazovka macOS). Spouští se nyní s `SDL_VIDEO_MAC_FULLSCREEN_SPACES=0`:
+  celá obrazovka je okno přes celý monitor bez přepínání ploch, pravý ⇧ + Enter přepíná okamžitě.

@@ -145,6 +145,8 @@ final class TabManager: ObservableObject {
     @Published var showQuickConnect = false     // ⇧⌘K – připojení zadáním user@host:port
     @Published var showCapture = false          // ⌥⌘P – průvodce tcpdump / fw monitor
     let capture = CaptureModel()                // parametry zůstávají mezi otevřeními
+    @Published var showMultiSend = false        // ⌥⌘I – odeslat příkazy do vybraných relací
+    let multiSend = MultiSendModel()            // text a výběr zůstávají mezi otevřeními
     @Published var liveCapture: LiveCapture?    // živý odchyt do Wiresharku (jeden současně)
     @Published var showFiles = false            // ⇧⌘E – panel souborů serveru (SFTP)
 
@@ -601,6 +603,9 @@ struct MainView: View {
         .sheet(isPresented: $tabs.showCapture) {
             CaptureSheet(m: tabs.capture).environmentObject(store).environmentObject(tabs)
         }
+        .sheet(isPresented: $tabs.showMultiSend) {
+            MultiSendSheet(m: tabs.multiSend).environmentObject(store).environmentObject(tabs)
+        }
         .alert(item: $serial.announce) { p in
             let baud = store.serialBaud(for: p)
             return Alert(
@@ -881,6 +886,7 @@ struct TabBar: View {
                 }
                 Divider()
                 Button(tabs.broadcast ? "Vypnout broadcast  ⇧⌘I" : "Broadcast vstupu…  ⇧⌘I") { tabs.toggleBroadcast() }
+                Button("Odeslat příkazy do relací…  ⌥⌘I") { tabs.showMultiSend = true }
                 Button("Hledat ve výstupu  ⌘F") { tabs.selected?.view.showFind() }
                 Button("Zachytávání paketů…  ⌥⌘P") { tabs.showCapture = true }
                 Button("Rychlé připojení…  ⇧⌘K") { tabs.showQuickConnect = true }
