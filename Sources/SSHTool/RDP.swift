@@ -226,7 +226,9 @@ final class RDPLauncher: ObservableObject {
         Task.detached {
             var password: String?
             if stored {
-                if needAuth, !UserAuth.authenticate(reason: "použít uložené heslo pro RDP „\(name)“") { return }
+                // příznak Touch ID se bere i z Klíčenky (jako u SSH) – sessions.json lze přepsat bez ověření
+                if needAuth || KeychainStore.requiresAuth(for: sid),
+                   !UserAuth.authenticate(reason: "použít uložené heslo pro RDP „\(name)“") { return }
                 password = KeychainStore.password(for: sid)
             }
             var t = s

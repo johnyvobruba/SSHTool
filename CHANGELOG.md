@@ -439,3 +439,17 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   ⌥⌘I panel zobrazí / skryje, křížkem se zavře. Relace se dají používat dál, text a výběr cílů v panelu zůstávají.
   - Cíle v menu „Cíle: n z m“ (zaškrtávání, Vše / Nic / Bez PROD / Jen složka), štítek PROD při produkčním cíli.
   - ⌘↩ odešle, potvrzení se seznamem cílů a příkazů zůstává; průběh a Zastavit přímo v panelu.
+
+## 0.27.2 – bezpečnostní opravy
+
+- **Import serverů – SSH:** z importovaných profilů se odstraní další argumenty ssh, které spouštějí lokální příkazy,
+  načítají kód nebo vypínají kontrolu klíče serveru (`ProxyCommand`, `LocalCommand`, `PermitLocalCommand`,
+  `KnownHostsCommand`, `Match`, `Include`, `PKCS11Provider`, `SecurityKeyProvider`, `StrictHostKeyChecking`,
+  `UserKnownHostsFile`, `-F`, `-I`, `-E`). Profily s hostem / uživatelem / jump hostem začínajícím „-“ se odmítnou.
+  Hláška po importu vypíše, co bylo odstraněno.
+- **Import serverů – RDP:** vynuluje se sdílení domovské složky, sdílené složky a další argumenty FreeRDP
+  (mohly zpřístupnit soubory Macu cizímu serveru).
+- **Uložené heslo SSH a neznámý klíč serveru:** místo tichého `StrictHostKeyChecking=accept-new` se zobrazí dialog
+  s otiskem SHA256 (výchozí volba Odmítnout). Změněný klíč se dál odmítá.
+- **RDP + Touch ID:** příznak „vyžadovat Touch ID“ se čte i z Klíčenky (jako u SSH), ne jen ze `sessions.json`.
+- ssh dostává `--` před cílem – host / uživatel začínající „-“ nemůže být vyložen jako volba.

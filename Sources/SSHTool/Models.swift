@@ -105,10 +105,9 @@ struct SSHSession: Codable, Identifiable, Hashable {
         if connectTimeout > 0 { a += ["-o", "ConnectTimeout=\(connectTimeout)"] }
         if ["ask", "yes", "accept-new"].contains(hostKeyPolicy) {
             a += ["-o", "StrictHostKeyChecking=\(hostKeyPolicy)"]
-        } else if usesStoredPassword {
-            // askpass neumí odpovědět yes/no na nový host key → nové klíče přijmout, změněné dál odmítat
-            a += ["-o", "StrictHostKeyChecking=accept-new"]
         }
+        // Uložené heslo: dotaz na neznámý klíč serveru zobrazí askpass jako dialog s otiskem (AskPass.swift),
+        // nový klíč se už nepřijímá automaticky (dřív accept-new → riziko MITM při prvním připojení).
         return a
     }
 
@@ -155,7 +154,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     }
 
     func sshArguments() -> [String] {
-        ["-p", String(port)] + commonOptions + extraTokens + [destination]
+        ["-p", String(port)] + commonOptions + extraTokens + ["--", destination]
     }
 
     /// sftp má port jako -P a nezná ssh-only přepínače (-t, -A, -L…) → z „Dalších argumentů“ bere jen -o volby.
@@ -310,6 +309,29 @@ final class AppStore: ObservableObject {
     // MARK: Import / export
 
     /// Import session z JSON (formát sessions.json). Session se stejným id se přeskočí – existující úpravy se nepřepíšou.
+    /// Volby ssh, které spouštějí lokální příkazy, načítají kód nebo vypínají kontrolu klíče serveru.
+    static let dangerousSSHOptions = ["proxycommand", "localcommand", "permitlocalcommand", "knownhostscommand",
+                                      "match", "include", "pkcs11provider", "securitykeyprovider",
+                                      "stricthostkeychecking", "userknownhostsfile", "globalknownhostsfile"]
+
+    /// Importovaný profil je cizí obsah: odstraní nastavení, která by při připojení spustila příkaz na Macu
+    /// nebo zpřístupnila jeho soubory. Vrací seznam odstraněného (pro hlášku).
+    static func sanitizeImported(_ s: inout SSHSession) -> [String] {
+        var removed: [String] = []
+        let low = s.extraArgs.lowercased().replacingOccurrences(of: " ", with: "")
+        let tokens = s.extraArgs.split(separator: " ").map(String.init)
+        let badOption = dangerousSSHOptions.contains { low.contains("-o" + $0) }
+        let badFlag = tokens.contains { ["-F", "-I", "-E"].contains($0) || $0.hasPrefix("-F") || $0.hasPrefix("-I") }
+        if badOption || badFlag {
+            removed.append("další argumenty ssh („\(s.extraArgs)“)")
+            s.extraArgs = ""
+        }
+        if s.rdpShareHome { removed.append("sdílení domovské složky"); s.rdpShareHome = false }
+        if !s.rdpFolders.isEmpty { removed.append("sdílené složky (\(s.rdpFolders.count))"); s.rdpFolders = [] }
+        if !s.rdpExtraArgs.isEmpty { removed.append("další argumenty FreeRDP („\(s.rdpExtraArgs)“)"); s.rdpExtraArgs = "" }
+        return removed
+    }
+
     func importSessionsPanel() {
         guard let url = Self.openJSON(title: "Importovat session") else { return }
         do {
@@ -320,11 +342,19 @@ final class AppStore: ObservableObject {
             var seen = Set(sessions.map(key))
             var added: [SSHSession] = []
             var invalid = 0
+            var sanitized: [String] = []
             for var s in incoming {
                 guard !known.contains(s.id), !seen.contains(key(s)) else { continue }
                 s.name = s.name.trimmingCharacters(in: .whitespaces)
                 s.host = s.host.trimmingCharacters(in: .whitespaces)
                 guard !s.name.isEmpty, !s.host.isEmpty, (1...65535).contains(s.port) else { invalid += 1; continue }
+                // host / uživatel / jump host začínající „-“ by ssh vzal jako volbu (injekce argumentů)
+                if s.host.hasPrefix("-") || s.user.hasPrefix("-") || s.jumpHost.hasPrefix("-")
+                    || s.host.contains(where: \.isWhitespace) || s.jumpHost.contains(where: \.isWhitespace) {
+                    invalid += 1; continue
+                }
+                let removed = Self.sanitizeImported(&s)
+                if !removed.isEmpty { sanitized.append("• \(s.name): " + removed.joined(separator: ", ")) }
                 s.hasStoredPassword = false                       // hesla se neimportují
                 if !["", "prod", "stage", "test", "dev"].contains(s.environment) { s.environment = "" }
                 if s.environment == "prod" { s.production = true }
@@ -336,7 +366,9 @@ final class AppStore: ObservableObject {
             let skipped = incoming.count - added.count - invalid
             Self.info("Import session", "Přidáno: \(added.count), přeskočeno (už existují): \(skipped)"
                       + (invalid > 0 ? ", neplatné (chybí název/host nebo špatný port): \(invalid)" : "") + "."
-                      + (added.contains { $0.auth == .password } ? "\nU serverů s heslem zadej heslo v editoru (Upravit)." : ""))
+                      + (added.contains { $0.auth == .password } ? "\nU serverů s heslem zadej heslo v editoru (Upravit)." : "")
+                      + (sanitized.isEmpty ? "" : "\n\nZ bezpečnostních důvodů odstraněno (nastav znovu ručně, pokud ho potřebuješ):\n"
+                         + sanitized.prefix(15).joined(separator: "\n") + (sanitized.count > 15 ? "\n…" : "")))
         } catch {
             Self.info("Import session selhal", Self.describeImportError(error))
         }
