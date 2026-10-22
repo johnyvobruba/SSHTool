@@ -53,7 +53,7 @@ enum SSHKeys {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-add")
         p.arguments = ["-L"]
-        var env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.sanitizedEnvironment
         if let socket { env["SSH_AUTH_SOCK"] = socket }
         p.environment = env
         let out = Pipe()

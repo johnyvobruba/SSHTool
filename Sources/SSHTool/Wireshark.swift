@@ -68,8 +68,8 @@ final class LiveCapture: ObservableObject, @unchecked Sendable {
 
         let s = Process()
         s.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-        s.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", destination, remote]
-        var env = ProcessInfo.processInfo.environment
+        s.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", "--", destination, remote]
+        var env = ProcessInfo.sanitizedEnvironment
         env.removeValue(forKey: "SSH_ASKPASS")
         s.environment = env
         s.standardInput = FileHandle.nullDevice

@@ -453,3 +453,16 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   s otiskem SHA256 (výchozí volba Odmítnout). Změněný klíč se dál odmítá.
 - **RDP + Touch ID:** příznak „vyžadovat Touch ID“ se čte i z Klíčenky (jako u SSH), ne jen ze `sessions.json`.
 - ssh dostává `--` před cílem – host / uživatel začínající „-“ nemůže být vyložen jako volba.
+
+## 0.27.3 – bezpečnostní opravy (2. kolo)
+
+- **Askpass vydá heslo jen ssh spuštěnému z SSHTool:** ověřuje řetězec rodičovských procesů (askpass ← ssh, případně
+  ssh pod ssh u jump hostu ← běžící aplikace SSHTool). Dřív stačilo spustit binárku SSHTool s `SSHTOOL_SESSION_ID`
+  a uložené heslo bez Touch ID se vypsalo.
+- **RDP:** z argumentů pro FreeRDP se odstraní konce řádků – přes `/args-from:stdin` by jinak název / uživatel /
+  doména s `\n` podstrčil další argument (např. `/drive:`).
+- **Validace serverů v editoru i při importu:** host, uživatel, jump host a RD Gateway nesmí začínat „-“, obsahovat
+  mezery ani řídicí znaky; `--` před cílem i u monitoru, Wiresharku živě a kontrola u pingu.
+- Spouštěné procesy (ssh, FreeRDP, sftp, lokální terminál…) nedostávají proměnné `DYLD_*` z prostředí aplikace.
+- `~/Library/Application Support/SSHTool` má práva 0700, `sessions.json` a ostatní soubory 0600.
+- Import pravidel zvýraznění vynechá regulární výrazy s vnořenými kvantifikátory (`(a+)+`, `(.*)*`) a delší než 500 znaků.

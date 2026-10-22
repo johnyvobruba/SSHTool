@@ -303,7 +303,7 @@ final class RDPLauncher: ObservableObject {
         p.executableURL = URL(fileURLWithPath: bin)
         // přibalený OpenSSL legacy provider (MD4 → NTLM → NLA bez domény)
         let binDir = URL(fileURLWithPath: bin).deletingLastPathComponent()
-        var env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.sanitizedEnvironment
         if let modules = [binDir.appendingPathComponent("../Frameworks/ossl-modules").standardized.path,
                           binDir.appendingPathComponent("ossl-modules").path]
             .first(where: { FileManager.default.fileExists(atPath: $0 + "/legacy.dylib") }) {
@@ -313,7 +313,8 @@ final class RDPLauncher: ObservableObject {
         // a zanikne černý Space (zčerná a „odjede“ celá obrazovka) a přepínání pravý ⇧+Enter je pomalé.
         env["SDL_VIDEO_MAC_FULLSCREEN_SPACES"] = "0"
         p.environment = env
-        let args = FreeRDP.arguments(s)
+        // \n v argumentu by při /args-from:stdin vytvořil další argument (např. /drive:x,/) → odstranit
+        let args = FreeRDP.arguments(s).map { $0.filter { !$0.isNewline } }
         p.arguments = password == nil ? args : ["/args-from:stdin"]
         let inPipe = Pipe(), errPipe = Pipe()
         p.standardInput = inPipe
@@ -390,7 +391,8 @@ final class RDPLauncher: ObservableObject {
         }
         if let password {
             // jeden argument na řádek; heslo jen tady (stdin), ne v argv
-            inPipe.fileHandleForWriting.write(Data((args + ["/p:\(password)"]).joined(separator: "\n").utf8 + Data("\n".utf8)))
+            let pw = password.filter { !$0.isNewline }
+            inPipe.fileHandleForWriting.write(Data((args + ["/p:\(pw)"]).joined(separator: "\n").utf8 + Data("\n".utf8)))
         }
         try? inPipe.fileHandleForWriting.close()
         running[s.id] = p

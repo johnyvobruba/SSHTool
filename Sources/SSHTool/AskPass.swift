@@ -1,8 +1,21 @@
 import Foundation
 import AppKit
+import Darwin
+
+extension ProcessInfo {
+    /// Prostředí pro spouštěné procesy bez DYLD_* (vložení knihoven do ssh / FreeRDP, které dostávají heslo).
+    static var sanitizedEnvironment: [String: String] {
+        processInfo.environment.filter { !$0.key.hasPrefix("DYLD_") }
+    }
+}
 
 enum AskPass {
     static func run(sessionID: String, prompt: String) -> Never {
+        // Heslo vydáme jen ssh, které spustila běžící aplikace SSHTool (ne libovolný proces s SSHTOOL_SESSION_ID).
+        guard calledFromSSHTool() else {
+            FileHandle.standardError.write(Data("sshtool: askpass odmítnut – nevolá ho ssh spuštěné z SSHTool\n".utf8))
+            exit(1)
+        }
         let p = prompt.lowercased()
         // Neznámý klíč serveru (StrictHostKeyChecking=ask): zeptat se uživatele dialogem s otiskem.
         // Dřív se kvůli askpass používalo accept-new = tichý souhlas → MITM při prvním připojení.
@@ -28,6 +41,34 @@ enum AskPass {
         guard let secret = KeychainStore.password(for: sessionID) else { exit(1) }
         FileHandle.standardOutput.write(Data((secret + "\n").utf8))
         exit(0)
+    }
+
+    // MARK: Ověření volajícího
+
+    private static func path(of pid: pid_t) -> String? {
+        var buf = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))     // PROC_PIDPATHINFO_MAXSIZE
+        guard proc_pidpath(pid, &buf, UInt32(buf.count)) > 0 else { return nil }
+        return URL(fileURLWithPath: String(cString: buf)).resolvingSymlinksInPath().path
+    }
+
+    private static func parent(of pid: pid_t) -> pid_t? {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        return pid_t(info.pbi_ppid)
+    }
+
+    /// Řetězec rodičů: askpass ← ssh (← ssh u jump hostu …) ← hlavní aplikace SSHTool (stejná binárka).
+    static func calledFromSSHTool() -> Bool {
+        guard let me = path(of: getpid()) else { return false }
+        var pid = getppid()
+        guard let first = path(of: pid), (first as NSString).lastPathComponent == "ssh" else { return false }
+        for _ in 0..<6 {
+            guard let pp = parent(of: pid), pp > 1, let p = path(of: pp) else { return false }
+            if (p as NSString).lastPathComponent == "ssh" { pid = pp; continue }    // ProxyJump: ssh pod ssh
+            return p == me && pp != getpid()
+        }
+        return false
     }
 
     /// Dialog „neznámý klíč serveru“ – výchozí volba je Odmítnout.

@@ -237,7 +237,9 @@ final class AppStore: ObservableObject {
     init() {
         directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("SSHTool", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         sessions = load("sessions.json") ?? []
         if let r: [HighlightRule] = load("rules.json") {
             rules = r
@@ -309,6 +311,19 @@ final class AppStore: ObservableObject {
     // MARK: Import / export
 
     /// Import session z JSON (formát sessions.json). Session se stejným id se přeskočí – existující úpravy se nepřepíšou.
+    /// Problém v polích, který by umožnil podstrčit volbu / argument (nil = v pořádku).
+    static func fieldProblem(_ s: SSHSession) -> String? {
+        let ctrl: (String) -> Bool = { $0.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } }
+        let fields = [("Název", s.name), ("Host", s.host), ("Uživatel", s.user), ("Jump host", s.jumpHost),
+                      ("Doména", s.rdpDomain), ("RD Gateway", s.rdpGateway)]
+        if let f = fields.first(where: { ctrl($0.1) }) { return "\(f.0) obsahuje řídicí znaky (např. konec řádku)." }
+        for (n, v) in [("Host", s.host), ("Uživatel", s.user), ("Jump host", s.jumpHost), ("RD Gateway", s.rdpGateway)] {
+            if v.hasPrefix("-") || (v.hasPrefix("/") && n != "Uživatel") { return "\(n) nesmí začínat znakem „\(v.prefix(1))“." }
+            if v.contains(where: \.isWhitespace) { return "\(n) nesmí obsahovat mezery." }
+        }
+        return nil
+    }
+
     /// Volby ssh, které spouštějí lokální příkazy, načítají kód nebo vypínají kontrolu klíče serveru.
     static let dangerousSSHOptions = ["proxycommand", "localcommand", "permitlocalcommand", "knownhostscommand",
                                       "match", "include", "pkcs11provider", "securitykeyprovider",
@@ -349,10 +364,7 @@ final class AppStore: ObservableObject {
                 s.host = s.host.trimmingCharacters(in: .whitespaces)
                 guard !s.name.isEmpty, !s.host.isEmpty, (1...65535).contains(s.port) else { invalid += 1; continue }
                 // host / uživatel / jump host začínající „-“ by ssh vzal jako volbu (injekce argumentů)
-                if s.host.hasPrefix("-") || s.user.hasPrefix("-") || s.jumpHost.hasPrefix("-")
-                    || s.host.contains(where: \.isWhitespace) || s.jumpHost.contains(where: \.isWhitespace) {
-                    invalid += 1; continue
-                }
+                if Self.fieldProblem(s) != nil { invalid += 1; continue }
                 let removed = Self.sanitizeImported(&s)
                 if !removed.isEmpty { sanitized.append("• \(s.name): " + removed.joined(separator: ", ")) }
                 s.hasStoredPassword = false                       // hesla se neimportují
@@ -377,7 +389,20 @@ final class AppStore: ObservableObject {
     func importRulesPanel() {
         guard let url = Self.openJSON(title: "Importovat pravidla") else { return }
         do {
-            rules = try JSONDecoder().decode([HighlightRule].self, from: Data(contentsOf: url))
+            var incoming = try JSONDecoder().decode([HighlightRule].self, from: Data(contentsOf: url))
+            // vnořené kvantifikátory typu (a+)+ / (.*)* a extrémně dlouhé vzory by mohly zamrznout terminál
+            let nested = #"\([^()]*[+*][^()]*\)\s*[+*{]"#
+            var dropped: [String] = []
+            incoming.removeAll { r in
+                let bad = r.isRegex && (r.pattern.count > 500 || r.pattern.range(of: nested, options: .regularExpression) != nil)
+                if bad { dropped.append(r.pattern) }
+                return bad
+            }
+            rules = incoming
+            if !dropped.isEmpty {
+                Self.info("Import pravidel", "Vynecháno \(dropped.count) pravidel s rizikovým regulárním výrazem (vnořené kvantifikátory nebo délka nad 500 znaků):\n"
+                          + dropped.prefix(5).map { "• " + String($0.prefix(80)) }.joined(separator: "\n"))
+            }
         } catch {
             Self.info("Import pravidel selhal", "\(error.localizedDescription)")
         }
@@ -591,7 +616,9 @@ final class AppStore: ObservableObject {
     private func save<T: Encodable>(_ value: T, to name: String) {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try? enc.encode(value).write(to: directory.appendingPathComponent(name), options: .atomic)
+        let url = directory.appendingPathComponent(name)
+        try? enc.encode(value).write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)   // inventář serverů
     }
 }
 

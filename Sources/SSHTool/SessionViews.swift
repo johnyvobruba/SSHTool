@@ -499,6 +499,15 @@ struct SessionEditor: View {
         s.host = s.host.trimmingCharacters(in: .whitespaces)
         s.group = s.group.trimmingCharacters(in: .whitespaces)
         s.keepAlive = max(0, s.keepAlive); s.connectTimeout = max(0, s.connectTimeout)
+        s.user = s.user.trimmingCharacters(in: .whitespaces)
+        s.jumpHost = s.jumpHost.trimmingCharacters(in: .whitespaces)
+        if let problem = AppStore.fieldProblem(s) {
+            let a = NSAlert(); a.alertStyle = .warning
+            a.messageText = "Server nelze uložit"
+            a.informativeText = problem
+            a.runModal()
+            return
+        }
         onSave(s, m.password.isEmpty ? nil : m.password)
         dismiss()
     }

@@ -97,7 +97,7 @@ final class RemoteMonitor: ObservableObject, @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: controlPath) else { return false }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-        p.arguments = ["-S", controlPath, "-O", "check", destination]
+        p.arguments = ["-S", controlPath, "-O", "check", "--", destination]
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         p.standardInput = FileHandle.nullDevice
@@ -112,7 +112,7 @@ final class RemoteMonitor: ObservableObject, @unchecked Sendable {
         p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
         p.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T",
                        destination, Self.script]
-        var env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.sanitizedEnvironment
         env.removeValue(forKey: "SSH_ASKPASS")
         p.environment = env
         p.standardInput = FileHandle.nullDevice

@@ -104,7 +104,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
         self.kind = kind
         self.session = session
         // Celé prostředí GUI aplikace (kvůli SSH_AUTH_SOCK, HOME, PATH…) + TERM.
-        var env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.sanitizedEnvironment
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }

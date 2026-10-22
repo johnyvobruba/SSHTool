@@ -100,7 +100,7 @@ final class SFTPBrowser: ObservableObject {
             p.executableURL = URL(fileURLWithPath: "/usr/bin/sftp")
             p.arguments = ["-b", "-", "-o", "ControlPath=\(cp)", "-o", "ControlMaster=no",
                            "-o", "BatchMode=yes", dest]
-            var env = ProcessInfo.processInfo.environment
+            var env = ProcessInfo.sanitizedEnvironment
             env.removeValue(forKey: "SSH_ASKPASS")
             p.environment = env
             let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()

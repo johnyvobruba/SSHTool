@@ -558,6 +558,7 @@ final class LatencyProbe: ObservableObject, @unchecked Sendable {
     }
 
     static func ping(_ host: String) -> Double? {
+        guard !host.hasPrefix("-") else { return nil }      // host nesmí být vyložen jako volba pingu
         let p = Process()
         let v6 = host.contains(":")
         p.executableURL = URL(fileURLWithPath: v6 ? "/sbin/ping6" : "/sbin/ping")

@@ -167,7 +167,7 @@ final class ConnectionTester: ObservableObject {
         // první -o vyhrává: striktní kontrola klíče (žádný zápis do known_hosts), žádná interakce
         p.arguments = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=8",
                        "-o", "NumberOfPasswordPrompts=0", "-T"] + args + ["exit"]
-        var env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.sanitizedEnvironment
         env.removeValue(forKey: "SSH_ASKPASS"); env.removeValue(forKey: "SSHTOOL_SESSION_ID")
         p.environment = env
         p.standardInput = FileHandle.nullDevice
