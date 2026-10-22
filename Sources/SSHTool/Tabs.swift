@@ -581,6 +581,10 @@ struct MainView: View {
                             .id(t.id)                    // každá záložka má vlastní prohlížeč
                     }
                 }
+                if tabs.showMultiSend {
+                    Rectangle().fill(UI.border).frame(height: 1)
+                    MultiSendBar(m: tabs.multiSend)
+                }
                 if tabs.focusMode && !store.settings.focusShowStatus {
                     EmptyView()
                 } else if let tab = tabs.selected {
@@ -602,9 +606,6 @@ struct MainView: View {
         }
         .sheet(isPresented: $tabs.showCapture) {
             CaptureSheet(m: tabs.capture).environmentObject(store).environmentObject(tabs)
-        }
-        .sheet(isPresented: $tabs.showMultiSend) {
-            MultiSendSheet(m: tabs.multiSend).environmentObject(store).environmentObject(tabs)
         }
         .alert(item: $serial.announce) { p in
             let baud = store.serialBaud(for: p)
@@ -886,7 +887,7 @@ struct TabBar: View {
                 }
                 Divider()
                 Button(tabs.broadcast ? "Vypnout broadcast  ⇧⌘I" : "Broadcast vstupu…  ⇧⌘I") { tabs.toggleBroadcast() }
-                Button("Odeslat příkazy do relací…  ⌥⌘I") { tabs.showMultiSend = true }
+                Button(tabs.showMultiSend ? "Skrýt odesílání příkazů  ⌥⌘I" : "Odeslat příkazy do relací  ⌥⌘I") { tabs.showMultiSend.toggle() }
                 Button("Hledat ve výstupu  ⌘F") { tabs.selected?.view.showFind() }
                 Button("Zachytávání paketů…  ⌥⌘P") { tabs.showCapture = true }
                 Button("Rychlé připojení…  ⇧⌘K") { tabs.showQuickConnect = true }

@@ -432,3 +432,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - RDP: odstraněno **bliknutí obrazovky při spuštění relace** – FreeRDP (SDL) při startu krátce vytvářel a rušil
   černý Space (nativní celá obrazovka macOS). Spouští se nyní s `SDL_VIDEO_MAC_FULLSCREEN_SPACES=0`:
   celá obrazovka je okno přes celý monitor bez přepínání ploch, pravý ⇧ + Enter přepíná okamžitě.
+
+## 0.27.1
+
+- **Odeslat příkazy do relací** je nově **panel ve spodní části okna** (přes všechny relace) místo modálního okna –
+  ⌥⌘I panel zobrazí / skryje, křížkem se zavře. Relace se dají používat dál, text a výběr cílů v panelu zůstávají.
+  - Cíle v menu „Cíle: n z m“ (zaškrtávání, Vše / Nic / Bez PROD / Jen složka), štítek PROD při produkčním cíli.
+  - ⌘↩ odešle, potvrzení se seznamem cílů a příkazů zůstává; průběh a Zastavit přímo v panelu.

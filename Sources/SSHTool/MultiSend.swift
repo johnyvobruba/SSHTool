@@ -107,15 +107,19 @@ final class MultiSendModel: ObservableObject {
     }
 }
 
-struct MultiSendSheet: View {
+/// Panel ve spodní části okna (přes všechny relace) – nemodální, relace se dají dál normálně používat.
+struct MultiSendBar: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var tabs: TabManager
     @ObservedObject var m: MultiSendModel
-    @Environment(\.dismiss) private var dismiss
 
     private var candidates: [TerminalTab] { MultiSendModel.candidates(tabs) }
+    private var selectedCount: Int { m.selected.intersection(Set(candidates.map(\.id))).count }
     private var folders: [String] {
         Array(Set(candidates.map { $0.session.group }.filter { !$0.isEmpty })).sorted()
+    }
+    private var prodSelected: Bool {
+        candidates.contains { m.selected.contains($0.id) && $0.session.envTag == "prod" }
     }
 
     private func binding(_ id: UUID) -> Binding<Bool> {
@@ -123,95 +127,101 @@ struct MultiSendSheet: View {
                 set: { on in if on { m.selected.insert(id) } else { m.selected.remove(id) } })
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section {
-                    if candidates.isEmpty {
-                        Text("Žádná aktivní SSH relace. Otevři nejdřív relace, do kterých chceš příkazy poslat.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(candidates) { t in
-                        Toggle(isOn: binding(t.id)) {
-                            HStack(spacing: 6) {
-                                Text(t.title)
-                                EnvBadge(tag: t.session.envTag)
-                                Spacer()
-                                Text(t.subtitle).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                            }
+    private var targetsMenu: some View {
+        Menu {
+            if candidates.isEmpty { Text("Žádná aktivní SSH relace") }
+            ForEach(candidates) { t in
+                Toggle("\(t.title)  ·  \(t.subtitle)\(t.session.envTag == "prod" ? "  ⚠️ PROD" : "")", isOn: binding(t.id))
+            }
+            if candidates.count > 1 {
+                Divider()
+                Button("Vše") { m.selected = Set(candidates.map(\.id)) }
+                Button("Nic") { m.selected = [] }
+                Button("Bez PROD") { m.selected = Set(candidates.filter { $0.session.envTag != "prod" }.map(\.id)) }
+                if !folders.isEmpty {
+                    Menu("Jen složka") {
+                        ForEach(folders, id: \.self) { f in
+                            Button(f) { m.selected = Set(candidates.filter { AppStore.inSubtree($0.session.group, f) }.map(\.id)) }
                         }
                     }
-                    if candidates.count > 1 {
-                        HStack {
-                            Button("Vše") { m.selected = Set(candidates.map(\.id)) }
-                            Button("Nic") { m.selected = [] }
-                            Button("Bez PROD") { m.selected = Set(candidates.filter { $0.session.envTag != "prod" }.map(\.id)) }
-                            if !folders.isEmpty {
-                                Menu("Jen složka") {
-                                    ForEach(folders, id: \.self) { f in
-                                        Button(f) { m.selected = Set(candidates.filter { AppStore.inSubtree($0.session.group, f) }.map(\.id)) }
-                                    }
-                                }
-                                .fixedSize()
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                } header: {
-                    Text("Cílové relace (\(m.selected.intersection(Set(candidates.map(\.id))).count) z \(candidates.count))")
-                }
-                Section {
-                    TextEditor(text: $m.commands)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 140)
-                    HStack {
-                        if !store.snippets.isEmpty {
-                            Menu("Vložit snippet") {
-                                ForEach(store.snippets) { s in
-                                    Button("\(s.name) – \(s.command)") {
-                                        m.commands += (m.commands.isEmpty || m.commands.hasSuffix("\n") ? "" : "\n") + s.command
-                                    }
-                                }
-                            }
-                            .fixedSize()
-                        }
-                        Spacer()
-                        Text("\(m.lines.count) řádků k odeslání").font(.caption).foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Příkazy (jeden na řádek)")
-                }
-                Section("Možnosti") {
-                    Toggle("Spustit – Enter za každým řádkem", isOn: $m.appendEnter)
-                    Toggle("Vynechat řádky začínající #", isOn: $m.skipComments)
-                    Stepper(value: $m.delayMs, in: 0...10_000, step: 100) {
-                        Text("Prodleva mezi řádky: \(m.delayMs) ms")
-                    }
-                    Text("Prodleva dává zařízení čas zpracovat předchozí příkaz (u pomalých CLI, např. clish, zvyš na 1000 ms a víc). Každé odeslání se zapíše do ~/Library/Logs/SSHTool/multisend.log – nevkládej do příkazů hesla.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .formStyle(.grouped)
-
-            HStack {
-                Text(m.progress).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Spacer()
-                Button("Audit log") { NSWorkspace.shared.open(MultiSendModel.auditURL) }
-                    .buttonStyle(SKButton())
-                    .disabled(!FileManager.default.fileExists(atPath: MultiSendModel.auditURL.path))
-                Button("Zavřít") { dismiss() }.keyboardShortcut(.cancelAction).buttonStyle(SKButton())
-                if m.running {
-                    Button("Zastavit") { m.stop() }.buttonStyle(SKButton(kind: .danger))
-                } else {
-                    Button("Odeslat…") { m.run(tabs) }
-                        .keyboardShortcut(.defaultAction)
-                        .buttonStyle(SKButton(kind: .primary))
-                        .disabled(m.lines.isEmpty || m.selected.intersection(Set(candidates.map(\.id))).isEmpty)
-                }
-            }
-            .padding(12)
+        } label: {
+            Label("Cíle: \(selectedCount) z \(candidates.count)", systemImage: "rectangle.stack")
         }
-        .frame(width: 620, height: 640)
+        .fixedSize()
+        .help(candidates.filter { m.selected.contains($0.id) }.map { $0.title }.joined(separator: ", "))
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                Label("Odeslat příkazy do relací", systemImage: "paperplane").font(.system(size: 11.5, weight: .semibold))
+                targetsMenu
+                if prodSelected {
+                    Text("PROD").font(.system(size: 10, weight: .bold)).foregroundStyle(UI.error)
+                        .help("Mezi cíli je produkční zařízení")
+                }
+                Toggle("Enter", isOn: $m.appendEnter).toggleStyle(.checkbox)
+                    .help("Za každý řádek poslat Enter (spustit). Vypnuto = text se jen vloží.")
+                Toggle("Bez #", isOn: $m.skipComments).toggleStyle(.checkbox)
+                    .help("Vynechat řádky začínající #")
+                Stepper(value: $m.delayMs, in: 0...10_000, step: 100) {
+                    Text("\(m.delayMs) ms").font(.system(size: 11, design: .monospaced))
+                }
+                .fixedSize()
+                .help("Prodleva mezi řádky – u pomalých CLI (clish) zvyš na 1000 ms a víc")
+                if !store.snippets.isEmpty {
+                    Menu("Snippet") {
+                        ForEach(store.snippets) { s in
+                            Button("\(s.name) – \(s.command)") {
+                                m.commands += (m.commands.isEmpty || m.commands.hasSuffix("\n") ? "" : "\n") + s.command
+                            }
+                        }
+                    }
+                    .fixedSize()
+                }
+                Spacer()
+                Text(m.progress).font(.caption).foregroundStyle(UI.textSecondary).lineLimit(1)
+                Button { NSWorkspace.shared.open(MultiSendModel.auditURL) } label: { Image(systemName: "doc.text.magnifyingglass") }
+                    .buttonStyle(.borderless)
+                    .help("Auditní log odeslaných příkazů (~/Library/Logs/SSHTool/multisend.log)")
+                    .disabled(!FileManager.default.fileExists(atPath: MultiSendModel.auditURL.path))
+                Button { tabs.showMultiSend = false } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.borderless).help("Zavřít panel  ⌥⌘I")
+            }
+            .font(.system(size: 11.5))
+            HStack(alignment: .bottom, spacing: 8) {
+                TextEditor(text: $m.commands)
+                    .font(.system(size: 12, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(SwiftUI.Color(nsColor: .textBackgroundColor)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(UI.border))
+                    .overlay(alignment: .topLeading) {
+                        if m.commands.isEmpty {
+                            Text("Příkazy, jeden na řádek…  (⌘↩ odeslat)")
+                                .font(.system(size: 12, design: .monospaced)).foregroundStyle(UI.textTertiary)
+                                .padding(.horizontal, 9).padding(.vertical, 4).allowsHitTesting(false)
+                        }
+                    }
+                VStack(spacing: 6) {
+                    Text("\(m.lines.count) ř.").font(.caption).foregroundStyle(UI.textSecondary)
+                    if m.running {
+                        Button("Zastavit") { m.stop() }.buttonStyle(SKButton(kind: .danger))
+                    } else {
+                        Button("Odeslat") { m.run(tabs) }
+                            .keyboardShortcut(.return, modifiers: .command)
+                            .buttonStyle(SKButton(kind: .primary))
+                            .disabled(m.lines.isEmpty || selectedCount == 0)
+                    }
+                }
+                .frame(width: 84)
+            }
+            .frame(height: 96)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(UI.statusBar)
         .onAppear { m.prepare(tabs) }
     }
 }
