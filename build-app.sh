@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.27.4}"
+VERSION="${VERSION_OVERRIDE:-0.27.5}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -103,8 +103,8 @@ RPLIST
     # verze přibalených závislostí (poznámky k vydání, sledování CVE)
     {
       echo "FreeRDP a závislosti přibalené v SSHTool $VERSION (Homebrew, $(date -u +%Y-%m-%d)):"
-      brew list --versions freerdp openssl@3 ffmpeg sdl3 sdl3_ttf sdl2 sdl2_ttf jpeg-turbo krb5 libusb cjson pkcs11-helper 2>/dev/null
-      echo "Sestavení: $("$H/sdl-freerdp" /version 2>/dev/null | head -1)"
+      brew list --versions freerdp openssl@3 ffmpeg sdl3 sdl3_ttf sdl2 sdl2_ttf jpeg-turbo krb5 libusb cjson pkcs11-helper 2>/dev/null || true    # chybějící formule = nenulový kód
+      echo "Sestavení: $( ("$H/sdl-freerdp" /version 2>/dev/null || true) | head -1)"
     } > "$APP/Contents/Resources/FreeRDP-VERSIONS.txt"
     cp "$APP/Contents/Resources/FreeRDP-VERSIONS.txt" build/FreeRDP-VERSIONS.txt
     # seznam knihoven do Resources hlavní aplikace (v Helpers smí být jen podepsaný kód)
