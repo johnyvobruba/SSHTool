@@ -480,3 +480,19 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   založí issue v repozitáři.
 - Wireshark (stažení odchytu): `--` před cílem ssh.
 - Build: soupis verzí závislostí nesmí shodit build (`set -euo pipefail` + chybějící formule Homebrew).
+
+## 0.28.0
+
+- **Tunelování portů** (jako v PuTTY → Connection → SSH → Tunnels) v editoru SSH serveru, sekce „Tunelování portů“:
+  - **Lokální** (`-L`): port na Macu → přes server → cíl (např. web / SmartConsole zařízení dostupné jen ze serveru).
+  - **Vzdálený** (`-R`): port na serveru → přes Mac → cíl.
+  - **Dynamický** (`-D`): SOCKS5 proxy na Macu.
+  - Každý tunel lze zapnout / vypnout, poznámka, náhled výsledného `ssh -L …`.
+  - Bezpečně ve výchozím stavu: naslouchá jen na 127.0.0.1 (Mac) / localhost (server); „Povolit z jiných počítačů“
+    je výslovná volba s varováním.
+- **Tunely za běhu:** pravé tlačítko na SSH záložce → „Tunely…“ – přehled aktivních tunelů, zrušení a přidání nového
+  bez odpojení (přes ControlMaster `ssh -O forward / cancel`), volitelně uložit i k serveru.
+- Stavový řádek ukazuje počet aktivních tunelů (⇄ n), kliknutím se otevře okno Tunely.
+- „Kopírovat SSH příkaz“ obsahuje i tunely.
+- Import serverů: tunely z cizího profilu se naimportují **vypnuté** a omezené na tento Mac (vzdálený tunel by
+  otevřel cestu do Macu / sítě).

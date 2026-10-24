@@ -454,6 +454,14 @@ struct StatusBar: View {
                 sep
                 Text(tab.running ? duration(ctx.date) : "Poslední relace: \(duration(ctx.date))")
                 if tab.running, let probe = tab.latency { sep; LatencyLabel(probe: probe) }
+                if tab.running, tab.kind == .ssh, !tab.forwards.isEmpty {
+                    sep
+                    Button { tabs.tunnelsTab = tab } label: {
+                        Label("\(tab.forwards.count)", systemImage: "arrow.left.arrow.right")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Tunely:\n" + tab.forwards.map { $0.label + ($0.note.isEmpty ? "" : "  – " + $0.note) }.joined(separator: "\n"))
+                }
                 if let live = tabs.liveCapture { sep; LiveCaptureBadge(capture: live) }
                 if tab.running, let mon = tab.monitor {
                     sep

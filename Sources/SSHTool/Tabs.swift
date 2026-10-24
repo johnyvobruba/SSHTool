@@ -32,6 +32,8 @@ final class TerminalTab: ObservableObject, Identifiable {
     private(set) var latency: LatencyProbe?
     /// Monitor CPU / RAM / disk serveru (jen SSH) – samostatný objekt, překresluje jen stavový řádek.
     private(set) var monitor: RemoteMonitor?
+    /// Aktivní tunely relace (z nastavení serveru + přidané za běhu).
+    @Published var forwards: [PortForward] = []
 
     var canMonitor: Bool { kind == .ssh && running && view.controlPath != nil }
 
@@ -95,6 +97,7 @@ final class TerminalTab: ObservableObject, Identifiable {
         self.session = session
         self.kind = kind
         self.serial = serial
+        self.forwards = kind == .ssh ? session.forwards.filter { $0.enabled && $0.problem == nil } : []
         view = SSHTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 560))
         view.onTerminated = { [weak self] code in
             self?.running = false
@@ -144,6 +147,7 @@ final class TabManager: ObservableObject {
     @Published var showPicker = false
     @Published var showQuickConnect = false     // ⇧⌘K – připojení zadáním user@host:port
     @Published var showCapture = false          // ⌥⌘P – průvodce tcpdump / fw monitor
+    @Published var tunnelsTab: TerminalTab?     // okno Tunely pro běžící SSH relaci
     let capture = CaptureModel()                // parametry zůstávají mezi otevřeními
     @Published var showMultiSend = false        // ⌥⌘I – odeslat příkazy do vybraných relací
     let multiSend = MultiSendModel()            // text a výběr zůstávají mezi otevřeními
@@ -604,6 +608,9 @@ struct MainView: View {
         .sheet(isPresented: $tabs.showPicker) {
             QuickConnectView().environmentObject(store).environmentObject(tabs)
         }
+        .sheet(item: $tabs.tunnelsTab) { t in
+            TunnelsSheet(tab: t).environmentObject(store)
+        }
         .sheet(isPresented: $tabs.showCapture) {
             CaptureSheet(m: tabs.capture).environmentObject(store).environmentObject(tabs)
         }
@@ -995,6 +1002,8 @@ struct TabContextMenu: View {
         }
         if tab.kind == .ssh {
             Button("Otevřít SFTP") { tabs.openSFTP(tab.session) }
+            Button("Tunely…\(tab.forwards.isEmpty ? "" : " (\(tab.forwards.count))")") { tabs.tunnelsTab = tab }
+                .disabled(!tab.running)
         }
         if tab.kind == .ssh || tab.kind == .sftp, let url = tab.session.webURL {
             Button("Otevřít web (\(url.absoluteString))") { WebOpener.open(tab.session) }

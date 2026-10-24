@@ -602,6 +602,20 @@ struct SessionEditor: View {
                     .padding(.top, 6)
                 }
             }
+            Section("Tunelování portů") {
+                ForEach($m.session.forwards) { $f in
+                    HStack(alignment: .top) {
+                        Toggle("", isOn: $f.enabled).labelsHidden().help("Tunel zapnutý")
+                        ForwardEditorRow(f: $f)
+                        Button { m.session.forwards.removeAll { $0.id == f.id } } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless).help("Odebrat tunel")
+                    }
+                    .padding(.vertical, 4)
+                }
+                Button("Přidat tunel") { m.session.forwards.append(PortForward()) }
+                Text("Jako v PuTTY (Connection → SSH → Tunnels). Tunely se otevřou při připojení SSH záložky; za běhu je přidáš / zrušíš pravým tlačítkem na záložce → „Tunely…“.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Test připojení") {
                 HStack {
                     Button {

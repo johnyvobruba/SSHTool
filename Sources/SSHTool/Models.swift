@@ -22,6 +22,8 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var identityFile: String = ""
     var jumpHost: String = ""
     var extraArgs: String = ""
+    /// Tunelování portů (-L / -R / -D), jen u SSH záložky.
+    var forwards: [PortForward] = []
     var hasStoredPassword = false
     /// Před použitím uloženého hesla vyžadovat Touch ID / heslo macOS (skutečný příznak je v Keychainu).
     var requireUserAuth = true
@@ -79,7 +81,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
+        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
              proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpMonitor, rdpAutoMonitor, rdpCertPolicy, rdpExtraArgs,
              rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
@@ -187,7 +189,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
 
     /// Ekvivalentní příkaz pro Terminál (pro „Kopírovat SSH příkaz“).
     var sshCommand: String {
-        let quoted = sshArguments().map { a -> String in
+        let quoted = (forwardArgs + sshArguments()).map { a -> String in
             a.contains(where: { " \"'$`\\".contains($0) }) ? "'" + a.replacingOccurrences(of: "'", with: "'\\''") + "'" : a
         }
         return "ssh " + quoted.joined(separator: " ")
@@ -342,6 +344,11 @@ final class AppStore: ObservableObject {
         if badOption || badFlag {
             removed.append("další argumenty ssh („\(s.extraArgs)“)")
             s.extraArgs = ""
+        }
+        // tunely z cizího profilu: vypnout a omezit na tento Mac (vzdálený tunel by otevřel cestu do Macu / sítě)
+        if s.forwards.contains(where: { $0.enabled || $0.allowRemote }) {
+            removed.append("tunely vypnuty (\(s.forwards.count)) – zapni je ručně v editoru")
+            for i in s.forwards.indices { s.forwards[i].enabled = false; s.forwards[i].allowRemote = false }
         }
         if s.rdpShareHome { removed.append("sdílení domovské složky"); s.rdpShareHome = false }
         if !s.rdpFolders.isEmpty { removed.append("sdílené složky (\(s.rdpFolders.count))"); s.rdpFolders = [] }
@@ -639,6 +646,7 @@ extension SSHSession {
         identityFile = try c.decodeIfPresent(String.self, forKey: .identityFile) ?? ""
         jumpHost = try c.decodeIfPresent(String.self, forKey: .jumpHost) ?? ""
         extraArgs = try c.decodeIfPresent(String.self, forKey: .extraArgs) ?? ""
+        forwards = try c.decodeIfPresent([PortForward].self, forKey: .forwards) ?? []
         hasStoredPassword = try c.decodeIfPresent(Bool.self, forKey: .hasStoredPassword) ?? false
         // starší záznamy: položky Keychainu příznak nemají → false (odpovídá skutečnosti)
         requireUserAuth = try c.decodeIfPresent(Bool.self, forKey: .requireUserAuth) ?? false

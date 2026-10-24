@@ -119,7 +119,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
         case .ssh:
             let cp = RemoteMonitor.controlPath(for: UUID())
             controlPath = cp
-            process.startProcess(executable: "/usr/bin/ssh", args: session.sshArguments(controlPath: cp),
+            process.startProcess(executable: "/usr/bin/ssh", args: session.forwardArgs + session.sshArguments(controlPath: cp),
                                  environment: envList, execName: "ssh")
         case .sftp:
             // SFTP záložka = grafický prohlížeč souborů. ssh tu jen drží přihlášené spojení (ControlMaster, -N);
