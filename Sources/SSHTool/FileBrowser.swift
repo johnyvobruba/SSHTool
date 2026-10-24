@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import Darwin
 
 // Prohlížeč souborů serveru (SFTP) v pravém panelu vedle terminálu.
 // Používá /usr/bin/sftp v dávkovém režimu přes ControlMaster socket SSH záložky →
@@ -27,6 +28,30 @@ final class SFTPBrowser: ObservableObject {
         var state: State = .running
         var detail = ""
         var reveal: URL?
+        var total: Int64 = 0            // 0 = neznámá velikost (složka ke stažení)
+        var done: Int64 = 0
+        var speed: Double = 0           // B/s (klouzavý průměr)
+        let started = Date()
+
+        var fraction: Double? { total > 0 ? min(1, Double(done) / Double(total)) : nil }
+
+        /// „45 % · 120 MB z 1,2 GB · 15 MB/s · zbývá 1:10“
+        var progressText: String {
+            let f = ByteCountFormatter()
+            var parts: [String] = []
+            if let fr = fraction { parts.append("\(Int(fr * 100)) %") }
+            parts.append(total > 0 ? "\(f.string(fromByteCount: done)) z \(f.string(fromByteCount: total))"
+                                   : f.string(fromByteCount: done))
+            if speed > 0 {
+                parts.append("\(f.string(fromByteCount: Int64(speed)))/s")
+                if total > done {
+                    let s = Int(Double(total - done) / speed)
+                    parts.append("zbývá " + (s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+                                                       : String(format: "%d:%02d", s / 60, s % 60)))
+                }
+            }
+            return parts.joined(separator: " · ")
+        }
     }
 
     @Published private(set) var path = ""
@@ -93,7 +118,7 @@ final class SFTPBrowser: ObservableObject {
         dir == "/" ? "/" + name : (dir.hasSuffix("/") ? dir + name : dir + "/" + name)
     }
 
-    private func run(_ commands: [String]) async -> (ok: Bool, out: String, err: String) {
+    private func run(_ commands: [String], pid: Box<Int32>? = nil) async -> (ok: Bool, out: String, err: String) {
         let cp = controlPath, dest = destination
         return await Task.detached {
             let p = Process()
@@ -108,6 +133,7 @@ final class SFTPBrowser: ObservableObject {
             p.standardOutput = outPipe
             p.standardError = errPipe
             do { try p.run() } catch { return (false, "", "Nelze spustit /usr/bin/sftp") }
+            pid?.value = p.processIdentifier
             inPipe.fileHandleForWriting.write(Data((commands.joined(separator: "\n") + "\n").utf8))
             try? inPipe.fileHandleForWriting.close()
             // stdout a stderr číst souběžně (velký výpis nesmí zablokovat rouru)
@@ -213,8 +239,39 @@ final class SFTPBrowser: ObservableObject {
         return t.id
     }
 
+    /// Průběh přenosu: každou ½ s zjistí z otevřených souborů procesu sftp, kolik bajtů je přečteno / zapsáno
+    /// (offset souboru na Macu pod `roots`). Nic neposílá na server, nezpomaluje přenos.
+    private func track(_ id: UUID, pid: Box<Int32>, roots: [String]) {
+        Task { @MainActor in
+            var seen: [String: Int64] = [:]       // soubor → poslední offset
+            var current: String?
+            var lastDone: Int64 = 0, lastTime = Date()
+            while let i = transfers.firstIndex(where: { $0.id == id }), transfers[i].state == .running {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                let p = pid.value
+                guard p > 0 else { continue }
+                let open = FDProgress.openFiles(pid: p).filter { f in roots.contains { f.path == $0 || f.path.hasPrefix($0 + "/") } }
+                if let f = open.first {
+                    if let c = current, c != f.path, let s = FDProgress.size(c) { seen[c] = s }   // předchozí hotový
+                    current = f.path
+                    seen[f.path] = f.offset
+                }
+                guard let j = transfers.firstIndex(where: { $0.id == id }), transfers[j].state == .running else { break }
+                let done = seen.values.reduce(0, +)
+                let now = Date(), dt = now.timeIntervalSince(lastTime)
+                if dt > 0, done >= lastDone {
+                    let inst = Double(done - lastDone) / dt
+                    transfers[j].speed = transfers[j].speed == 0 ? inst : transfers[j].speed * 0.7 + inst * 0.3
+                }
+                lastDone = done; lastTime = now
+                transfers[j].done = transfers[j].total > 0 ? min(done, transfers[j].total) : done
+            }
+        }
+    }
+
     private func finish(_ id: UUID, _ ok: Bool, _ detail: String, reveal: URL? = nil) {
         guard let i = transfers.firstIndex(where: { $0.id == id }) else { return }
+        if ok, transfers[i].total > 0 { transfers[i].done = transfers[i].total }
         transfers[i].state = ok ? .ok : .failed
         transfers[i].detail = detail
         transfers[i].reveal = reveal
@@ -246,6 +303,12 @@ final class SFTPBrowser: ObservableObject {
         }
         let title = items.count == 1 ? "↓ \(items[0].name)" : "↓ \(items.count) položek"
         let id = addTransfer(title)
+        if let i = transfers.firstIndex(where: { $0.id == id }), !items.contains(where: \.isDir) {
+            transfers[i].total = items.reduce(0) { $0 + $1.size }       // u složek velikost předem neznáme
+        }
+        let roots = single.map { [$0.path] } ?? items.map { targetDir.appendingPathComponent($0.name).path }
+        let pid = Box<Int32>(0)
+        track(id, pid: pid, roots: roots)
         let dir = path
         var cmds = ["lcd " + Self.q(targetDir.path), "cd " + Self.q(dir)]
         if let single {
@@ -254,7 +317,7 @@ final class SFTPBrowser: ObservableObject {
             cmds += items.map { "get -r -p " + Self.q($0.name) }
         }
         Task {
-            let r = await run(cmds)
+            let r = await run(cmds, pid: pid)
             let reveal = single ?? (items.count == 1 ? targetDir.appendingPathComponent(items[0].name) : targetDir)
             finish(id, r.ok, r.ok ? "Uloženo do \(targetDir.path)" : Self.cleanErr(r.err), reveal: r.ok ? reveal : nil)
         }
@@ -284,10 +347,13 @@ final class SFTPBrowser: ObservableObject {
             guard a.runModal() == .alertFirstButtonReturn else { return }
         }
         let id = addTransfer(urls.count == 1 ? "↑ \(urls[0].lastPathComponent)" : "↑ \(urls.count) položek")
+        if let i = transfers.firstIndex(where: { $0.id == id }) { transfers[i].total = FDProgress.totalSize(urls) }
+        let pid = Box<Int32>(0)
+        track(id, pid: pid, roots: urls.map { $0.resolvingSymlinksInPath().path })
         let dir = path
         let cmds = ["cd " + Self.q(dir)] + urls.map { "put -r -p " + Self.q($0.path) }
         Task {
-            let r = await run(cmds)
+            let r = await run(cmds, pid: pid)
             finish(id, r.ok, r.ok ? "Nahráno do \(dir)" : Self.cleanErr(r.err))
             if r.ok, path == dir { await list(dir) }
         }
@@ -487,21 +553,32 @@ struct FileBrowserPanel: View {
                         Button("Vyčistit") { b.clearFinished() }.buttonStyle(.plain).font(.system(size: 10.5)).foregroundStyle(UI.accent)
                     }
                     ForEach(b.transfers.prefix(5)) { t in
-                        HStack(spacing: 6) {
-                            switch t.state {
-                            case .running: ProgressView().controlSize(.mini)
-                            case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(UI.ok)
-                            case .failed: Image(systemName: "xmark.octagon.fill").foregroundStyle(UI.error)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                switch t.state {
+                                case .running: ProgressView().controlSize(.mini)
+                                case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(UI.ok)
+                                case .failed: Image(systemName: "xmark.octagon.fill").foregroundStyle(UI.error)
+                                }
+                                Text(t.title).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 4)
+                                if t.state == .running, let fr = t.fraction {
+                                    Text("\(Int(fr * 100)) %").font(.system(size: 11, design: .monospaced))
+                                }
+                                if let u = t.reveal {
+                                    Button { NSWorkspace.shared.activateFileViewerSelecting([u]) } label: { Image(systemName: "magnifyingglass") }
+                                        .buttonStyle(.plain).foregroundStyle(UI.accent).help("Zobrazit ve Finderu")
+                                }
                             }
-                            Text(t.title).lineLimit(1)
-                            Spacer(minLength: 4)
-                            if let u = t.reveal {
-                                Button { NSWorkspace.shared.activateFileViewerSelecting([u]) } label: { Image(systemName: "magnifyingglass") }
-                                    .buttonStyle(.plain).foregroundStyle(UI.accent).help("Zobrazit ve Finderu")
+                            if t.state == .running {
+                                if let fr = t.fraction {
+                                    ProgressView(value: fr).progressViewStyle(.linear).controlSize(.small)
+                                }
+                                Text(t.progressText).font(.system(size: 10, design: .monospaced)).foregroundStyle(UI.textSecondary)
                             }
                         }
                         .font(.system(size: 11))
-                        .help(t.detail)
+                        .help(t.detail.isEmpty ? t.progressText : t.detail)
                     }
                 }
                 .padding(8)
@@ -525,4 +602,50 @@ final class Box<T>: @unchecked Sendable {
         set { lock.lock(); v = newValue; lock.unlock() }
     }
     func mutate(_ f: (inout T) -> Void) { lock.lock(); f(&v); lock.unlock() }
+}
+
+/// Průběh přenosu z otevřených souborů procesu (libproc) – offset souboru na Macu, který sftp čte / zapisuje.
+enum FDProgress {
+    struct OpenFile { let path: String; let offset: Int64 }
+
+    static func openFiles(pid: Int32) -> [OpenFile] {
+        let bufSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard bufSize > 0 else { return [] }
+        let count = Int(bufSize) / MemoryLayout<proc_fdinfo>.stride
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: count)
+        let used = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, bufSize)
+        guard used > 0 else { return [] }
+        var out: [OpenFile] = []
+        for fd in fds.prefix(Int(used) / MemoryLayout<proc_fdinfo>.stride) where fd.proc_fdtype == UInt32(PROX_FDTYPE_VNODE) {
+            var info = vnode_fdinfowithpath()
+            let size = Int32(MemoryLayout<vnode_fdinfowithpath>.stride)
+            guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, size) == size else { continue }
+            let path = withUnsafePointer(to: &info.pvip.vip_path) {
+                $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+            }
+            out.append(OpenFile(path: path, offset: info.pfi.fi_offset))
+        }
+        return out
+    }
+
+    static func size(_ path: String) -> Int64? {
+        (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64
+    }
+
+    /// Celková velikost souborů (i ve složkách) k nahrání.
+    static func totalSize(_ urls: [URL]) -> Int64 {
+        var total: Int64 = 0
+        for u in urls {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir) else { continue }
+            if !isDir.boolValue { total += size(u.path) ?? 0; continue }
+            if let e = FileManager.default.enumerator(at: u, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) {
+                for case let f as URL in e {
+                    let v = try? f.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                    if v?.isRegularFile == true { total += Int64(v?.fileSize ?? 0) }
+                }
+            }
+        }
+        return total
+    }
 }

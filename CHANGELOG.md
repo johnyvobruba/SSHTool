@@ -496,3 +496,9 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - „Kopírovat SSH příkaz“ obsahuje i tunely.
 - Import serverů: tunely z cizího profilu se naimportují **vypnuté** a omezené na tento Mac (vzdálený tunel by
   otevřel cestu do Macu / sítě).
+
+## 0.28.1
+
+- **SFTP – průběh přenosu:** u nahrávání i stahování se zobrazuje procento, ukazatel průběhu, přenesená / celková
+  velikost, rychlost a odhad zbývajícího času. Průběh se čte z otevřených souborů procesu sftp na Macu (libproc),
+  nic navíc se na server neposílá. U stahování celé složky (velikost předem neznámá) se ukazuje přenesený objem a rychlost.
