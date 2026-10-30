@@ -52,16 +52,21 @@ final class MultiSendModel: ObservableObject {
         let a = NSAlert()
         a.alertStyle = prod.isEmpty ? .warning : .critical
         a.messageText = "Odeslat \(lines.count) \(lines.count == 1 ? "příkaz" : "příkazů") do \(targets.count) relací?"
-        var info = "Cíle:\n" + targets.map { "• \($0.session.name) (\($0.subtitle))" }.joined(separator: "\n")
+        // název záložky (i přejmenované) + skutečný server, ke kterému je relace připojená
+        let label: (TerminalTab) -> String = { t in
+            let shown = tabs.displayTitle(t)
+            return shown == t.session.name ? "\(shown) (\(t.subtitle))" : "\(shown) (přes \(t.session.name) · \(t.subtitle))"
+        }
+        var info = "Cíle:\n" + targets.map { "• " + label($0) }.joined(separator: "\n")
         info += "\n\nPříkazy:\n" + lines.prefix(12).map { "  " + $0 }.joined(separator: "\n")
         if lines.count > 12 { info += "\n  … a dalších \(lines.count - 12)" }
-        if !prod.isEmpty { info += "\n\n⚠️ PRODUKČNÍ zařízení (\(prod.count)): " + prod.map { $0.session.name }.joined(separator: ", ") }
+        if !prod.isEmpty { info += "\n\n⚠️ PRODUKČNÍ zařízení (\(prod.count)): " + prod.map { tabs.displayTitle($0) }.joined(separator: ", ") }
         if !appendEnter { info += "\n\nBez Enteru – text se jen vloží, nespustí se." }
         a.informativeText = info
         a.addButton(withTitle: "Odeslat"); a.addButton(withTitle: "Zrušit")
         guard a.runModal() == .alertFirstButtonReturn else { return }
 
-        Self.audit(targets: targets, lines: lines, enter: appendEnter)
+        Self.audit(targets: targets.map(label), lines: lines, enter: appendEnter)
         cancelled = false
         running = true
         let delay = UInt64(max(0, delayMs)) * 1_000_000
@@ -84,7 +89,7 @@ final class MultiSendModel: ObservableObject {
     }
 
     /// Auditní záznam: ~/Library/Logs/SSHTool/multisend.log (jen pro uživatele, 0600).
-    static func audit(targets: [TerminalTab], lines: [String], enter: Bool) {
+    static func audit(targets: [String], lines: [String], enter: Bool) {
         let fm = FileManager.default
         let dir = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/SSHTool", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -93,7 +98,7 @@ final class MultiSendModel: ObservableObject {
             fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
         }
         var text = "===== \(ISO8601DateFormatter().string(from: Date()))\(enter ? "" : " (bez Enteru)")\n"
-        text += "Cíle: " + targets.map { "\($0.session.name) [\($0.subtitle)]" }.joined(separator: ", ") + "\n"
+        text += "Cíle: " + targets.joined(separator: ", ") + "\n"
         text += lines.map { "> " + $0 }.joined(separator: "\n") + "\n\n"
         if let h = try? FileHandle(forWritingTo: url) {
             _ = try? h.seekToEnd()
@@ -131,7 +136,7 @@ struct MultiSendBar: View {
         Menu {
             if candidates.isEmpty { Text("Žádná aktivní SSH relace") }
             ForEach(candidates) { t in
-                Toggle("\(t.title)  ·  \(t.subtitle)\(t.session.envTag == "prod" ? "  ⚠️ PROD" : "")", isOn: binding(t.id))
+                Toggle("\(tabs.displayTitle(t))  ·  \(t.subtitle)\(t.session.envTag == "prod" ? "  ⚠️ PROD" : "")", isOn: binding(t.id))
             }
             if candidates.count > 1 {
                 Divider()
@@ -150,7 +155,7 @@ struct MultiSendBar: View {
             Label("Cíle: \(selectedCount) z \(candidates.count)", systemImage: "rectangle.stack")
         }
         .fixedSize()
-        .help(candidates.filter { m.selected.contains($0.id) }.map { $0.title }.joined(separator: ", "))
+        .help(candidates.filter { m.selected.contains($0.id) }.map { tabs.displayTitle($0) }.joined(separator: ", "))
     }
 
     var body: some View {

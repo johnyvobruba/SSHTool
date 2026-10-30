@@ -502,3 +502,9 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **SFTP – průběh přenosu:** u nahrávání i stahování se zobrazuje procento, ukazatel průběhu, přenesená / celková
   velikost, rychlost a odhad zbývajícího času. Průběh se čte z otevřených souborů procesu sftp na Macu (libproc),
   nic navíc se na server neposílá. U stahování celé složky (velikost předem neznámá) se ukazuje přenesený objem a rychlost.
+
+## 0.28.2
+
+- Odeslat příkazy do relací: cíle se zobrazují pod **názvem záložky** (i přejmenované), ne pod názvem serveru –
+  relace na různá zařízení přes stejný skokový server jdou rozlišit. Dvě nepřejmenované relace na stejný server
+  mají číslo („lom-chpmgmt 2“). V potvrzení a auditním logu je název záložky i skutečný server („mho2 (přes lom-chpmgmt · 10.105.100.7)“).
