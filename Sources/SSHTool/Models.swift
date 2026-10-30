@@ -459,6 +459,25 @@ final class AppStore: ObservableObject {
         settings.themeID = id
         if !t.isDark { settings.appearance = "light" }
         else if settings.appearance == "light" { settings.appearance = "dark" }
+        if id == "walnut" { offerWalnutRuleColors() }
+    }
+
+    /// Profil Walnut: nabídne přebarvení pravidel zvýraznění do přírodních odstínů (původní se zálohují).
+    func offerWalnutRuleColors() {
+        let changes = HighlightRule.walnutRecolor(rules)
+        guard changes.count > 0 else { return }
+        let a = NSAlert()
+        a.messageText = "Přebarvit zvýraznění pro profil Walnut?"
+        a.informativeText = "Upraví barvy \(changes.count) pravidel (ACTIVE, STANDBY, BOOTING, IP adresy, hostname, rozhraní, TX/RX, chyby) do tlumených přírodních odstínů. Původní pravidla se uloží do rules-before-walnut.json ve složce dat aplikace."
+        a.addButton(withTitle: "Přebarvit"); a.addButton(withTitle: "Ponechat")
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let backup = directory.appendingPathComponent("rules-before-walnut.json")
+        if !FileManager.default.fileExists(atPath: backup.path), let d = try? enc.encode(rules) {
+            try? d.write(to: backup, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backup.path)
+        }
+        rules = changes.rules
     }
 
     /// Zvýrazňování lze vypnout – výstup se pak vykresluje přesně, jak ho poslal server.

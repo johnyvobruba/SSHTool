@@ -508,3 +508,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Odeslat příkazy do relací: cíle se zobrazují pod **názvem záložky** (i přejmenované), ne pod názvem serveru –
   relace na různá zařízení přes stejný skokový server jdou rozlišit. Dvě nepřejmenované relace na stejný server
   mají číslo („lom-chpmgmt 2“). V potvrzení a auditním logu je název záložky i skutečný server („mho2 (přes lom-chpmgmt · 10.105.100.7)“).
+
+## 0.28.3
+
+- Nový barevný profil **Walnut** (teplý ořech): hnědé pozadí aplikace, postranního panelu, záložek i terminálu,
+  text v barvě slonové kosti, měděný akcent (aktivní záložka, přepínače, zaškrtávací pole místo modré),
+  výběr textu #604832. Stavové barvy: šalvějová (připojeno), světlá zlatá (připojování), lososová (chyba).
+- Při výběru Walnut aplikace nabídne přebarvení pravidel zvýraznění do přírodních odstínů – ACTIVE šalvějová,
+  STANDBY levandulová, BOOTING zlatá na hnědém, IP olivová, hostname písková, rozhraní tyrkysová, TX medová,
+  RX růžovofialová, chyby lososová. Původní pravidla se uloží do `rules-before-walnut.json`.

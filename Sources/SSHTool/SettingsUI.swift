@@ -453,6 +453,7 @@ struct SettingsAppearancePane: View {
         // výběr světlého/tmavého profilu přepne i režim, ať je změna hned vidět
         if !t.isDark { store.settings.appearance = "light" }
         else if store.settings.appearance == "light" { store.settings.appearance = "dark" }
+        if t.id == "walnut" { store.offerWalnutRuleColors() }
     }
 }
 

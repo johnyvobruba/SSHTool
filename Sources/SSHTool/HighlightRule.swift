@@ -93,3 +93,33 @@ extension HighlightRule {
         testText = try c.decodeIfPresent(String.self, forKey: .testText) ?? ""
     }
 }
+
+extension HighlightRule {
+    /// Barvy zvýraznění pro profil Walnut – podle obsahu vzoru (funguje i s upravenými pravidly).
+    /// Vrací nová pravidla a počet změněných.
+    static func walnutRecolor(_ rules: [HighlightRule]) -> (rules: [HighlightRule], count: Int) {
+        func style(_ p: String) -> (fg: String, bg: String?)? {
+            let u = p.uppercased()
+            if u.contains("BOOTING") { return ("#F0CC8D", "#594127") }
+            if u.contains("STANDBY") { return ("#C5ACD1", nil) }
+            if u.contains("ACTIVE") || u.contains("CONNECTED") { return ("#B6CE91", nil) }
+            if p.contains("){3}") || p.contains("\\d{1,3}\\.") { return ("#CAD69B", nil) }          // IPv4 / IPv6 / MAC
+            if u.contains("ETH") || u.contains("BOND") { return ("#A0CBC1", nil) }                       // rozhraní
+            if u.contains("-CORE-") || u.contains("HOSTNAME") || u.contains("VSX") { return ("#E6BB87", nil) }
+            if p == "TX" { return ("#E6BE78", nil) }
+            if p == "RX" { return ("#D4AFC6", nil) }
+            if u.contains("FAIL") || u.contains("ERROR") || u.contains("DENIED") || u.contains("DOWN") { return ("#F09B88", nil) }
+            return nil
+        }
+        var out = rules, n = 0
+        for i in out.indices {
+            guard let s = style(out[i].pattern) else { continue }
+            if out[i].foreground != s.fg || out[i].background != s.bg {
+                out[i].foreground = s.fg
+                out[i].background = s.bg
+                n += 1
+            }
+        }
+        return (out, n)
+    }
+}

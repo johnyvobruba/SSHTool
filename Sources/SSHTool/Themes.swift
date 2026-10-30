@@ -100,7 +100,20 @@ extension Theme {
         ansiNormal: ["#303846", "#C43D4B", "#18794E", "#A96816", "#356AC3", "#8C4DB5", "#087F8C", "#465365"],
         ansiBright: ["#6B7788", "#D9535F", "#1F9461", "#C07B1E", "#4A82D9", "#A365CC", "#0E98A7", "#202938"])
 
-    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .arctic]
+    /// Teplý ořech – hnědé pozadí, slonová kost, měděný akcent; významové barvy v tlumených přírodních odstínech.
+    static let walnut = Theme(
+        id: "walnut", name: "Walnut", note: "Teplý ořech · espresso, krémový papír, měď", isDark: true,
+        appBackground: "#302720", sidebarBackground: "#382D25", toolbarBackground: "#332920",
+        tabInactiveBackground: "#3D3128", tabActiveBackground: "#514033",
+        itemSelectedBackground: "#5B4533", itemHoverBackground: "#46372B", borderColor: "#68513E",
+        textPrimary: "#F0E4D3", textSecondary: "#C0AB93", textTertiary: "#B29A80", accentColor: "#E0AB72",
+        statusConnected: "#B6CE91", statusConnecting: "#F0CC8D", statusError: "#F09B88",
+        foreground: "#F0E4D3", background: "#261F1A", cursor: "#E0AB72", cursorText: "#261F1A",
+        selectionBackground: "#604832",
+        ansiNormal: ["#3D3128", "#F09B88", "#B6CE91", "#F0CC8D", "#A3B6C9", "#D4AFC6", "#A0CBC1", "#E6D8C5"],
+        ansiBright: ["#68513E", "#F5B2A2", "#C8DCA8", "#F6DBA9", "#BAC9D8", "#E0C3D5", "#B9DAD2", "#F0E4D3"])
+
+    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .walnut, .arctic]
 
     static func byID(_ id: String) -> Theme { all.first { $0.id == id } ?? .midnight }
 }
