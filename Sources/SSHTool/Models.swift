@@ -459,20 +459,22 @@ final class AppStore: ObservableObject {
         settings.themeID = id
         if !t.isDark { settings.appearance = "light" }
         else if settings.appearance == "light" { settings.appearance = "dark" }
-        if id == "walnut" { offerWalnutRuleColors() }
+        offerRuleColors(for: id)
     }
 
-    /// Profil Walnut: nabídne přebarvení pravidel zvýraznění do přírodních odstínů (původní se zálohují).
-    func offerWalnutRuleColors() {
-        let changes = HighlightRule.walnutRecolor(rules)
+    /// Profily Walnut / Sandstone: nabídne přebarvení pravidel zvýraznění do odstínů profilu (původní se zálohují).
+    func offerRuleColors(for id: String) {
+        guard let palette = RulePalette.forTheme(id) else { return }
+        let changes = HighlightRule.recolor(rules, palette)
         guard changes.count > 0 else { return }
+        let name = Theme.byID(id).name
         let a = NSAlert()
-        a.messageText = "Přebarvit zvýraznění pro profil Walnut?"
-        a.informativeText = "Upraví barvy \(changes.count) pravidel (ACTIVE, STANDBY, BOOTING, IP adresy, hostname, rozhraní, TX/RX, chyby) do tlumených přírodních odstínů. Původní pravidla se uloží do rules-before-walnut.json ve složce dat aplikace."
+        a.messageText = "Přebarvit zvýraznění pro profil \(name)?"
+        a.informativeText = "Upraví barvy \(changes.count) pravidel (ACTIVE, STANDBY, BOOTING, IP adresy, hostname, rozhraní, TX/RX, chyby) do odstínů profilu. Původní pravidla se uloží do rules-before-\(id).json ve složce dat aplikace."
         a.addButton(withTitle: "Přebarvit"); a.addButton(withTitle: "Ponechat")
         guard a.runModal() == .alertFirstButtonReturn else { return }
         let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let backup = directory.appendingPathComponent("rules-before-walnut.json")
+        let backup = directory.appendingPathComponent("rules-before-\(id).json")
         if !FileManager.default.fileExists(atPath: backup.path), let d = try? enc.encode(rules) {
             try? d.write(to: backup, options: .atomic)
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backup.path)

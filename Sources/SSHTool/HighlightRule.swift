@@ -94,29 +94,46 @@ extension HighlightRule {
     }
 }
 
+/// Barvy zvýraznění k profilu (pravidla jsou společná pro všechny profily – při výběru se nabídne přebarvení).
+struct RulePalette {
+    let active, standby, bootingFg, bootingBg, ip, hostname, iface, tx, rx, error: String
+
+    static let walnut = RulePalette(active: "#B6CE91", standby: "#C5ACD1", bootingFg: "#F0CC8D", bootingBg: "#594127",
+                                    ip: "#CAD69B", hostname: "#E6BB87", iface: "#A0CBC1", tx: "#E6BE78", rx: "#D4AFC6", error: "#F09B88")
+    static let sandstone = RulePalette(active: "#356344", standby: "#735581", bootingFg: "#795019", bootingBg: "#F1DFBA",
+                                       ip: "#52652E", hostname: "#80502F", iface: "#306B6B", tx: "#885718", rx: "#80516F", error: "#AD3F32")
+
+    static func forTheme(_ id: String) -> RulePalette? {
+        switch id {
+        case "walnut": return .walnut
+        case "sandstone": return .sandstone
+        default: return nil
+        }
+    }
+}
+
 extension HighlightRule {
-    /// Barvy zvýraznění pro profil Walnut – podle obsahu vzoru (funguje i s upravenými pravidly).
-    /// Vrací nová pravidla a počet změněných.
-    static func walnutRecolor(_ rules: [HighlightRule]) -> (rules: [HighlightRule], count: Int) {
+    /// Přebarví pravidla podle obsahu vzoru (funguje i s upravenými pravidly). Vrací nová pravidla a počet změněných.
+    static func recolor(_ rules: [HighlightRule], _ c: RulePalette) -> (rules: [HighlightRule], count: Int) {
         func style(_ p: String) -> (fg: String, bg: String?)? {
             let u = p.uppercased()
-            if u.contains("BOOTING") { return ("#F0CC8D", "#594127") }
-            if u.contains("STANDBY") { return ("#C5ACD1", nil) }
-            if u.contains("ACTIVE") || u.contains("CONNECTED") { return ("#B6CE91", nil) }
-            if p.contains("){3}") || p.contains("\\d{1,3}\\.") { return ("#CAD69B", nil) }          // IPv4 / IPv6 / MAC
-            if u.contains("ETH") || u.contains("BOND") { return ("#A0CBC1", nil) }                       // rozhraní
-            if u.contains("-CORE-") || u.contains("HOSTNAME") || u.contains("VSX") { return ("#E6BB87", nil) }
-            if p == "TX" { return ("#E6BE78", nil) }
-            if p == "RX" { return ("#D4AFC6", nil) }
-            if u.contains("FAIL") || u.contains("ERROR") || u.contains("DENIED") || u.contains("DOWN") { return ("#F09B88", nil) }
+            if u.contains("BOOTING") { return (c.bootingFg, c.bootingBg) }
+            if u.contains("STANDBY") { return (c.standby, nil) }
+            if u.contains("ACTIVE") || u.contains("CONNECTED") { return (c.active, nil) }
+            if p.contains("){3}") || p.contains("\\d{1,3}\\.") { return (c.ip, nil) }               // IPv4 / IPv6 / MAC
+            if u.contains("ETH") || u.contains("BOND") { return (c.iface, nil) }                       // rozhraní
+            if u.contains("-CORE-") || u.contains("HOSTNAME") || u.contains("VSX") { return (c.hostname, nil) }
+            if p == "TX" { return (c.tx, nil) }
+            if p == "RX" { return (c.rx, nil) }
+            if u.contains("FAIL") || u.contains("ERROR") || u.contains("DENIED") || u.contains("DOWN") { return (c.error, nil) }
             return nil
         }
         var out = rules, n = 0
         for i in out.indices {
-            guard let s = style(out[i].pattern) else { continue }
-            if out[i].foreground != s.fg || out[i].background != s.bg {
-                out[i].foreground = s.fg
-                out[i].background = s.bg
+            guard let st = style(out[i].pattern) else { continue }
+            if out[i].foreground != st.fg || out[i].background != st.bg {
+                out[i].foreground = st.fg
+                out[i].background = st.bg
                 n += 1
             }
         }

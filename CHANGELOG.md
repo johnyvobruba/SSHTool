@@ -517,3 +517,13 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - Při výběru Walnut aplikace nabídne přebarvení pravidel zvýraznění do přírodních odstínů – ACTIVE šalvějová,
   STANDBY levandulová, BOOTING zlatá na hnědém, IP olivová, hostname písková, rozhraní tyrkysová, TX medová,
   RX růžovofialová, chyby lososová. Původní pravidla se uloží do `rules-before-walnut.json`.
+
+## 0.28.4
+
+- Nový světlý barevný profil **Sandstone** (teplý písek): krémové pozadí, pískové panely, tmavě hnědý text,
+  měděný akcent #925B32. Aktivní záložka splývá s krémovým terminálem (#F5EFE5) a má měděnou linku,
+  sidebar je o stupeň tmavší. Světlejší než Walnut, méně zářivý než Arctic Light.
+- Při výběru Sandstone se nabídne přebarvení pravidel zvýraznění do hlubších přírodních odstínů
+  (ACTIVE lesní zelená, STANDBY tlumená fialová, BOOTING tmavá okrová na #F1DFBA, IP olivová, hostname ořechová,
+  rozhraní petrolejová, TX karamelová, RX švestková, chyby cihlová); původní pravidla do `rules-before-sandstone.json`.
+- Oprava: režim vzhledu „Světlý“ používal vždy Arctic Light – nyní použije zvolený světlý profil.

@@ -113,7 +113,21 @@ extension Theme {
         ansiNormal: ["#3D3128", "#F09B88", "#B6CE91", "#F0CC8D", "#A3B6C9", "#D4AFC6", "#A0CBC1", "#E6D8C5"],
         ansiBright: ["#68513E", "#F5B2A2", "#C8DCA8", "#F6DBA9", "#BAC9D8", "#E0C3D5", "#B9DAD2", "#F0E4D3"])
 
-    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .walnut, .arctic]
+    /// Teplý písek – krémové pozadí, pískové panely, tmavě hnědý text, měděný akcent. Světlejší než Walnut,
+    /// méně zářivý než Arctic Light. Aktivní záložka splývá s krémovým terminálem.
+    static let sandstone = Theme(
+        id: "sandstone", name: "Sandstone", note: "Světlý · teplý písek, matný papír, měď", isDark: false,
+        appBackground: "#E9E0D3", sidebarBackground: "#DED3C3", toolbarBackground: "#E5DACC",
+        tabInactiveBackground: "#DDD0BF", tabActiveBackground: "#F5EFE5",
+        itemSelectedBackground: "#D9C3A7", itemHoverBackground: "#E5D5C0", borderColor: "#BBA991",
+        textPrimary: "#3D332B", textSecondary: "#6E5D4D", textTertiary: "#796652", accentColor: "#925B32",
+        statusConnected: "#356344", statusConnecting: "#795019", statusError: "#AD3F32",
+        foreground: "#3D332B", background: "#F5EFE5", cursor: "#925B32", cursorText: "#F5EFE5",
+        selectionBackground: "#DFC8A8",
+        ansiNormal: ["#3D332B", "#AD3F32", "#356344", "#795019", "#3F5E7A", "#735581", "#306B6B", "#6E5D4D"],
+        ansiBright: ["#796652", "#C2513F", "#447A55", "#8F6224", "#52738F", "#886896", "#3E8080", "#3D332B"])
+
+    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .walnut, .sandstone, .arctic]
 
     static func byID(_ id: String) -> Theme { all.first { $0.id == id } ?? .midnight }
 }
@@ -132,7 +146,7 @@ enum ThemeStore {
         let dark = chosen.isDark ? chosen : .midnight
         let ui: Theme
         switch s.appearance {
-        case "light": ui = .arctic
+        case "light": ui = chosen.isDark ? .arctic : chosen
         case "system": ui = systemIsDark ? dark : (chosen.isDark ? .arctic : chosen)
         default: ui = chosen.isDark ? chosen : dark
         }
