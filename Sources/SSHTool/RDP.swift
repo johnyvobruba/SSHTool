@@ -140,7 +140,8 @@ enum FreeRDP {
         if !s.rdpUDP { a.append("-multitransport") }
         if s.rdpDebugLog { a.append("/log-level:DEBUG") }
         // INFO jen pro client.common – zpráva o přihlášení (Logon Info) = relace se úspěšně spustila
-        else { a.append("/log-filters:com.freerdp.client.common:INFO") }
+        // + INFO pro com.freerdp.gdi: „gdi_init_ex“ = spojení navázané, plocha (i přihlašovací obrazovka) se kreslí
+        else { a.append("/log-filters:com.freerdp.client.common:INFO,com.freerdp.gdi:INFO") }
         a += s.rdpExtraArgs.split(separator: " ").map(String.init)
         return a
     }
@@ -159,6 +160,8 @@ final class RDPLauncher: ObservableObject {
     private var stopping: Set<UUID> = []
     /// Značky ve výstupu FreeRDP, že proběhlo přihlášení do Windows.
     static let logonMarkers = ["save_session_info", "Logon Extended Info", "LogonId"]
+    /// Spojení navázané a okno relace kreslí (u TLS bez NLA ještě před přihlášením do Windows) → konec průběhu.
+    static let connectedMarkers = ["gdi_init_ex", "gdi_init"]
     var onChange: (() -> Void)?
     /// Opona proti bliknutí při přechodu do celé obrazovky (viz RDPCurtain).
     private var curtains: [UUID: RDPCurtain] = [:]
@@ -379,6 +382,9 @@ final class RDPLauncher: ObservableObject {
             sink.write(text)
             if !loggedOn.value, let ph = RDPLauncher.phase(in: text) {
                 DispatchQueue.main.async { self.progress[s.id]?.setPhase(ph) }
+            }
+            if RDPLauncher.connectedMarkers.contains(where: { text.contains($0) }) {
+                DispatchQueue.main.async { self.endProgress(s.id) }
             }
             if !loggedOn.value, RDPLauncher.logonMarkers.contains(where: { text.contains($0) }) {
                 loggedOn.value = true

@@ -203,7 +203,7 @@ final class RDPProgress: NSObject {
             DispatchQueue.main.async { self?.refresh() }
         }
         // pojistka – panel nesmí zůstat viset
-        DispatchQueue.main.asyncAfter(deadline: .now() + 180) { [weak self] in self?.close() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 90) { [weak self] in self?.close() }
     }
 
     func setPhase(_ p: String) { guard !closed, p != phase else { return }; phase = p; refresh() }

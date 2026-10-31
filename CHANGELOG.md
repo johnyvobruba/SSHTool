@@ -606,3 +606,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **Průběh připojování RDP**: nahoře na monitoru se zobrazí panel s fází připojení (spojení, certifikát, přihlašování NLA, licencování), uplynulým časem, číslem pokusu a tlačítkem Zrušit. Panel zmizí po přihlášení do Windows.
 - **Rychlejší kompatibilní režim**: když selže už přihlášení NLA, nezkouší se zbytečně režim bez GFX/UDP a rovnou se nabídne TLS.
   - Když chybí NTLM (vadné sestavení), aplikace řekne proč a downgrade na TLS nenabízí.
+
+## 0.32.2
+
+- **RDP – panel průběhu zůstával viset**: u spojení přes TLS (bez NLA) FreeRDP nevypíše informaci o přihlášení, takže panel „Ověřování certifikátu serveru…“ nezmizel. Teď zmizí, jakmile je spojení navázané a okno relace kreslí (značka `gdi_init_ex`). Pojistka je nově 90 s místo 3 minut.
