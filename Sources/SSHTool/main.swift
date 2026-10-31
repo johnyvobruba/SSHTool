@@ -19,6 +19,13 @@ if let host = launchEnv["SSHTOOL_TELNET_HOST"] {
     TelnetBridge.run(host: host, port: Int(launchEnv["SSHTOOL_TELNET_PORT"] ?? "") ?? 23)
 }
 
+// Sestavení (build-app.sh): vykreslit ikonu do PNG a skončit – např. ikona přibaleného RDP klienta.
+if let out = launchEnv["SSHTOOL_RENDER_ICON"] {
+    let label = launchEnv["SSHTOOL_RENDER_LABEL"] ?? "SSH"
+    let ok = MainActor.assumeIsolated { ThemedIcon.writePNG(Theme.midnight, label: label, to: out) }
+    exit(ok ? 0 : 1)
+}
+
 // Zápis do roury, kterou druhá strana zavřela (např. zavřený Wireshark), nesmí aplikaci shodit (SIGPIPE).
 signal(SIGPIPE, SIG_IGN)
 

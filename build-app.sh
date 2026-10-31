@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.35.2}"
+VERSION="${VERSION_OVERRIDE:-0.35.3}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -147,6 +147,24 @@ if [[ -f Resources/AppIcon.png ]]; then
   ICON_PLIST="<key>CFBundleIconFile</key><string>AppIcon</string>"
 fi
 
+# Ikona přibaleného RDP klienta: stejný motiv, kurzor místo „>_“ a nápis RDP (vykreslí ji sama binárka SSHTool)
+RDP_ICNS=""
+if [[ -d "$APP/Contents/Helpers/SSHTool-RDP.app" ]]; then
+  rm -f build/AppIcon-RDP.png
+  if SSHTOOL_RENDER_ICON="build/AppIcon-RDP.png" SSHTOOL_RENDER_LABEL="RDP" "$BIN" && [[ -s build/AppIcon-RDP.png ]]; then
+    ICONSET="build/AppIcon-RDP.iconset"
+    rm -rf "$ICONSET" && mkdir -p "$ICONSET"
+    for s in 16 32 128 256 512; do
+      sips -z $s $s           build/AppIcon-RDP.png --out "$ICONSET/icon_${s}x${s}.png"    >/dev/null
+      sips -z $((s*2)) $((s*2)) build/AppIcon-RDP.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+    done
+    iconutil -c icns "$ICONSET" -o build/AppIcon-RDP.icns && RDP_ICNS="build/AppIcon-RDP.icns"
+    echo "  + ikona RDP klienta"
+  else
+    echo "  ! ikonu RDP klienta se nepodařilo vykreslit – použije se ikona SSHTool"
+  fi
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -179,7 +197,11 @@ chmod -R u+w "$APP"
 echo "▶ Podepisuji (${IDENTITY})…"
 RDP_APP="$APP/Contents/Helpers/SSHTool-RDP.app"
 if [[ -d "$RDP_APP" ]]; then
-  [[ -f "$APP/Contents/Resources/AppIcon.icns" ]] && cp "$APP/Contents/Resources/AppIcon.icns" "$RDP_APP/Contents/Resources/"
+  if [[ -n "$RDP_ICNS" ]]; then
+    cp "$RDP_ICNS" "$RDP_APP/Contents/Resources/AppIcon.icns"
+  elif [[ -f "$APP/Contents/Resources/AppIcon.icns" ]]; then
+    cp "$APP/Contents/Resources/AppIcon.icns" "$RDP_APP/Contents/Resources/"
+  fi
   codesign --force --sign "$IDENTITY" "$RDP_APP"
 fi
 codesign --force --options runtime --sign "$IDENTITY" "$APP"

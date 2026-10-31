@@ -13,7 +13,22 @@ enum ThemedIcon {
         NSApp.applicationIconImage = render(t)
     }
 
-    static func render(_ t: Theme, size: CGFloat = 1024) -> NSImage {
+    /// PNG ikony (pro build-app.sh: ikona přibaleného RDP klienta s nápisem „RDP“).
+    static func writePNG(_ t: Theme, label: String, to path: String) -> Bool {
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0),
+              let ctx = NSGraphicsContext(bitmapImageRep: rep) else { return false }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        render(t, label: label).draw(in: NSRect(x: 0, y: 0, width: 1024, height: 1024))
+        ctx.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        guard let data = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? data.write(to: URL(fileURLWithPath: path))) != nil
+    }
+
+    static func render(_ t: Theme, size: CGFloat = 1024, label: String = "SSH") -> NSImage {
         func c(_ hex: String) -> NSColor { TabbyTheme.nsColor(hex) }
         let accent = c(t.accentColor)
         return NSImage(size: NSSize(width: size, height: size), flipped: true) { _ in
@@ -48,6 +63,20 @@ enum ThemedIcon {
                 NSBezierPath(ovalIn: NSRect(x: 262 + CGFloat(i) * 66, y: 284, width: 40, height: 40)).fill()
             }
 
+            if label == "RDP" {
+                // vzdálená plocha: kurzor myši místo výzvy terminálu
+                NSGraphicsContext.saveGraphicsState()
+                g.setShadow(offset: .zero, blur: 18, color: c(t.foreground).withAlphaComponent(0.5).cgColor)
+                let arrow = NSBezierPath()
+                arrow.move(to: NSPoint(x: 300, y: 410)); arrow.line(to: NSPoint(x: 300, y: 600))
+                arrow.line(to: NSPoint(x: 346, y: 556)); arrow.line(to: NSPoint(x: 378, y: 626))
+                arrow.line(to: NSPoint(x: 410, y: 612)); arrow.line(to: NSPoint(x: 378, y: 543))
+                arrow.line(to: NSPoint(x: 440, y: 543)); arrow.close()
+                arrow.lineJoinStyle = .round
+                c(t.foreground).setFill(); arrow.fill()
+                c(t.background).setStroke(); arrow.lineWidth = 8; arrow.stroke()
+                NSGraphicsContext.restoreGraphicsState()
+            } else {
             // výzva „>_“
             NSGraphicsContext.saveGraphicsState()
             g.setShadow(offset: .zero, blur: 18, color: c(t.foreground).withAlphaComponent(0.5).cgColor)
@@ -59,6 +88,7 @@ enum ThemedIcon {
             c(t.foreground).setFill()
             NSBezierPath(roundedRect: NSRect(x: 380, y: 580, width: 112, height: 26), xRadius: 13, yRadius: 13).fill()
             NSGraphicsContext.restoreGraphicsState()
+            }
 
             // zámek „SSH“ v barvě zvýraznění profilu
             NSGraphicsContext.saveGraphicsState()
@@ -76,7 +106,7 @@ enum ThemedIcon {
             accent.setStroke(); body.lineWidth = 6; body.stroke()
             NSGraphicsContext.restoreGraphicsState()
             let font = NSFont.systemFont(ofSize: 112, weight: .bold)
-            let text = NSAttributedString(string: "SSH", attributes: [.font: font, .foregroundColor: accent])
+            let text = NSAttributedString(string: label, attributes: [.font: font, .foregroundColor: accent])
             let ts = text.size()
             text.draw(at: NSPoint(x: 707 - ts.width / 2, y: 710 - ts.height / 2))
             return true

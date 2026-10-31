@@ -663,3 +663,8 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 
 - **RDP v celé obrazovce – panel průběhu nezmizel** („Ověřování certifikátu serveru…“ běžel dál): okno FreeRDP v celé obrazovce má vyšší vrstvu než běžná okna a detekce ho přehlížela. Teď se panel zavře i v celé obrazovce.
 - **Menu lišty u horního okraje** (výřez displeje): menu se otevírá níž, aby ho macOS neodroloval a byla vidět i první položka.
+
+## 0.35.3
+
+- **Vlastní ikona RDP klienta**: přibalený FreeRDP (SSHTool RDP) má v Docku vlastní ikonu: stejný motiv, ale kurzor myši místo „>_“ a na zámku nápis **RDP**. Ikonu při sestavení vykreslí sama binárka SSHTool.
+  - Barvu podle profilu RDP ikona nemění: je to samostatná aplikace a macOS nedovolí jiné aplikaci měnit její ikonu v Docku za běhu. Má barvy výchozího profilu Midnight.
