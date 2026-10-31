@@ -610,3 +610,9 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.32.2
 
 - **RDP – panel průběhu zůstával viset**: u spojení přes TLS (bez NLA) FreeRDP nevypíše informaci o přihlášení, takže panel „Ověřování certifikátu serveru…“ nezmizel. Teď zmizí, jakmile je spojení navázané a okno relace kreslí (značka `gdi_init_ex`). Pojistka je nově 90 s místo 3 minut.
+
+## 0.32.3
+
+- **RDP – panel průběhu zmizí, jakmile se otevře okno relace**: FreeRDP píše výpis přes rouru s bufferem, takže zprávy do SSHTool přicházejí se zpožděním (i minuty). Panel proto sleduje okna procesu FreeRDP (CGWindowList, bez zvláštních oprávnění).
+  - Panel zmizí, když je okno relace (alespoň 640 × 400) vidět asi 1 s.
+  - Menší připojovací a chybové dialogy FreeRDP panel nezavřou.

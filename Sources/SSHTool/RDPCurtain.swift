@@ -206,11 +206,35 @@ final class RDPProgress: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 90) { [weak self] in self?.close() }
     }
 
+    private var pid: Int32 = 0
+    private var windowTicks = 0
+
+    /// Konec průběhu podle okna relace: výpis FreeRDP jde přes rouru s bufferem a přichází se zpožděním
+    /// (klidně minuty), na značky v logu se proto spolehnout nedá. Velké viditelné okno procesu = relace běží.
+    func attach(pid: Int32) { self.pid = pid; windowTicks = 0 }
+
+    private func sessionWindowVisible() -> Bool {
+        guard pid > 0, let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return false }
+        for w in info {
+            guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
+                  (w[kCGWindowLayer as String] as? Int) == 0,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b as CFDictionary) else { continue }
+            if r.width >= 640 && r.height >= 400 { return true }     // připojovací/chybový dialog FreeRDP je menší
+        }
+        return false
+    }
+
     func setPhase(_ p: String) { guard !closed, p != phase else { return }; phase = p; refresh() }
 
     func nextAttempt(_ note: String) { attempt += 1; phase = note; refresh() }
 
     private func refresh() {
+        if !closed, pid > 0 {
+            windowTicks = sessionWindowVisible() ? windowTicks + 1 : 0
+            if windowTicks >= 2 { close(); return }                 // okno relace je vidět ≥ ~1 s
+        }
         let s = Int(Date().timeIntervalSince(started))
         detail.stringValue = "\(phase)… · \(s / 60):\(String(format: "%02d", s % 60))" + (attempt > 1 ? " · pokus \(attempt)" : "")
     }

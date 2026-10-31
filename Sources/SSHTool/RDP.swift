@@ -492,6 +492,7 @@ final class RDPLauncher: ObservableObject {
         }
         try? inPipe.fileHandleForWriting.close()
         curtains[s.id]?.attach(pid: p.processIdentifier, loggedOn: loggedOn)
+        progress[s.id]?.attach(pid: p.processIdentifier)
         running[s.id] = p
         onChange?()
         if s.rdpSize == "fullscreen", !s.rdpMultiMon, s.rdpAutoMonitor {
