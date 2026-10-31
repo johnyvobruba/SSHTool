@@ -31,6 +31,8 @@ struct SSHSession: Codable, Identifiable, Hashable {
     /// Poznámky k serveru (zobrazí se v tooltipu a v editoru).
     var notes = ""
     var hasStoredPassword = false
+    /// Heslo z externího správce hesel (op://…, bw://…, kpxc://…); "" = Klíčenka.
+    var passwordRef = ""
     /// Před použitím uloženého hesla vyžadovat Touch ID / heslo macOS (skutečný příznak je v Keychainu).
     var requireUserAuth = true
     /// SSH agent pro auth == .agent: "" = systémový (SSH_AUTH_SOCK / ~/.ssh/config), "bitwarden", jinak cesta k socketu.
@@ -91,12 +93,12 @@ struct SSHSession: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, legacyAlgorithms, x11, notes, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
+        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, legacyAlgorithms, x11, notes, hasStoredPassword, passwordRef, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
              proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpMonitor, rdpAutoMonitor, rdpCertPolicy, rdpExtraArgs,
              rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
 
-    var usesStoredPassword: Bool { auth == .password && hasStoredPassword }
+    var usesStoredPassword: Bool { auth == .password && (hasStoredPassword || !passwordRef.isEmpty) }
 
     /// Volby společné pro ssh i sftp (klíč, jump host, heslo).
     private var commonOptions: [String] {
@@ -395,6 +397,8 @@ final class AppStore: ObservableObject {
         }
         // důvěryhodné X11 (-Y) dává serveru plný přístup k displeji (zachytávání kláves) – z cizího profilu ne
         if s.x11 == "trusted" { removed.append("důvěryhodné X11 → nedůvěryhodné"); s.x11 = "untrusted" }
+        // odkaz na správce hesel z cizího profilu by po připojení poslal tvoje heslo na cizí server
+        if !s.passwordRef.isEmpty { removed.append("odkaz na správce hesel"); s.passwordRef = "" }
         if s.rdpShareHome { removed.append("sdílení domovské složky"); s.rdpShareHome = false }
         if !s.rdpFolders.isEmpty { removed.append("sdílené složky (\(s.rdpFolders.count))"); s.rdpFolders = [] }
         if !s.rdpExtraArgs.isEmpty { removed.append("další argumenty FreeRDP („\(s.rdpExtraArgs)“)"); s.rdpExtraArgs = "" }
@@ -402,9 +406,14 @@ final class AppStore: ObservableObject {
     }
 
     func importSessionsPanel() {
-        guard let url = Self.openJSON(title: "Importovat session") else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Importovat servery"
+        panel.message = "SSHTool JSON, iTerm2 (JSON), RDCMan (.rdg), mRemoteNG (confCons.xml), CSV, soubory .rdp – lze vybrat více souborů"
+        panel.allowedContentTypes = ServerImporter.contentTypes
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         do {
-            let incoming = try JSONDecoder().decode([SSHSession].self, from: Data(contentsOf: url))
+            let incoming = try ServerImporter.load(panel.urls)
             let known = Set(sessions.map(\.id))
             // duplicita = stejné id, nebo stejný název + skupina + host + port (vzor bez id lze nahrát opakovaně)
             func key(_ s: SSHSession) -> String { "\(s.name.lowercased())|\(s.group.lowercased())|\(s.host.lowercased())|\(s.port)" }
@@ -718,6 +727,8 @@ extension SSHSession {
         x11 = ["untrusted", "trusted"].contains(x) ? x : ""
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         hasStoredPassword = try c.decodeIfPresent(Bool.self, forKey: .hasStoredPassword) ?? false
+        let ref = try c.decodeIfPresent(String.self, forKey: .passwordRef) ?? ""
+        passwordRef = ExternalSecrets.kind(of: ref) != nil ? ref : ""
         // starší záznamy: položky Keychainu příznak nemají → false (odpovídá skutečnosti)
         requireUserAuth = try c.decodeIfPresent(Bool.self, forKey: .requireUserAuth) ?? false
         agentSocket = try c.decodeIfPresent(String.self, forKey: .agentSocket) ?? ""

@@ -112,6 +112,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             env["SSH_ASKPASS"] = exe                 // ssh (i ssh pod sftp) zavolá naši vlastní binárku…
             env["SSH_ASKPASS_REQUIRE"] = "force"     // …i když má TTY (OpenSSH 8.4+)
             env["SSHTOOL_SESSION_ID"] = session.id.uuidString
+            if !session.passwordRef.isEmpty { env["SSHTOOL_PASSWORD_REF"] = session.passwordRef }
         }
         let envList = env.map { "\($0.key)=\($0.value)" }
         isRunning = true

@@ -223,9 +223,19 @@ final class RDPLauncher: ObservableObject {
         // celá obrazovka: na kterém monitoru (název z macOS → ID podle FreeRDP)
         let wantFull = s.rdpSize == "fullscreen" && !s.rdpMultiMon
         let screenName = wantFull ? FreeRDP.targetScreen(s)?.localizedName : nil
+        let ref = s.passwordRef
         Task.detached {
             var password: String?
-            if stored {
+            if !ref.isEmpty {
+                switch ExternalSecrets.fetch(ref) {
+                case .success(let p): password = p
+                case .failure(let f):
+                    await MainActor.run {
+                        let a = NSAlert(); a.messageText = "Heslo pro RDP „\(name)“ nelze načíst"; a.informativeText = f.message; a.runModal()
+                    }
+                    return
+                }
+            } else if stored {
                 // příznak Touch ID se bere i z Klíčenky (jako u SSH) – sessions.json lze přepsat bez ověření
                 if needAuth || KeychainStore.requiresAuth(for: sid),
                    !UserAuth.authenticate(reason: "použít uložené heslo pro RDP „\(name)“") { return }

@@ -925,6 +925,8 @@ struct SettingsServersPane: View {
         ("rdpDebugLog", "ne", "RDP: true/false – podrobný log FreeRDP (diagnostika)"),
         ("rdpFolders", "ne", "RDP: pole cest ke sdíleným složkám, např. [\"/Users/jan/RDP\"]"),
         ("rdpMonitor", "ne", "RDP: název monitoru pro celou obrazovku (\"\" = kde je okno SSHTool)"),
+        ("passwordRef", "ne", "op://…, bw://…, kpxc://… – heslo ze správce hesel (při importu se z bezpečnostních důvodů vynuluje)"),
+        ("notes, x11", "ne", "poznámka; X11: \"\", untrusted, trusted"),
         ("legacyAlgorithms", "ne", "true/false – starší zařízení: povolit ssh-rsa, SHA-1 KEX, CBC (jen tento server)"),
         ("forwards", "ne", "Tunely: [{\"kind\":\"L\",\"listenPort\":8443,\"destHost\":\"10.0.0.5\",\"destPort\":443}] – L/R/D; po importu vypnuté"),
         ("rdpAutoMonitor", "ne", "RDP: true/false – po přesunu celé obrazovky na jiný monitor automaticky přepojit"),

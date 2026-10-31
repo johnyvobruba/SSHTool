@@ -29,6 +29,15 @@ enum AskPass {
             FileHandle.standardError.write(Data("sshtool: neznámý askpass dotaz: \(prompt)\n".utf8))
             exit(1)
         }
+        // Heslo z externího správce hesel (1Password / Bitwarden / KeePassXC) – ten si ověření řeší sám.
+        if let ref = ProcessInfo.processInfo.environment["SSHTOOL_PASSWORD_REF"], !ref.isEmpty, p.contains("password") {
+            switch ExternalSecrets.fetch(ref) {
+            case .success(let secret):
+                FileHandle.standardOutput.write(Data((secret + "\n").utf8)); exit(0)
+            case .failure(let f):
+                FileHandle.standardError.write(Data("sshtool: \(f.message)\n".utf8)); exit(1)
+            }
+        }
         // Session s ochranou: před vydáním hesla Touch ID / heslo macOS.
         // Chrání i proti tomu, že binárku v režimu askpass spustí jiný program – uvidíš nečekaný dialog a zrušíš ho.
         if KeychainStore.requiresAuth(for: sessionID) {

@@ -719,9 +719,8 @@ struct SessionEditor: View {
 
     @ViewBuilder private var rdpSections: some View {
         Section("Přihlášení") {
-            SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
-            Toggle("Před použitím hesla vyžadovat Touch ID / heslo Macu", isOn: $m.session.requireUserAuth)
-            Text("Heslo je jen v Klíčence macOS a FreeRDP ho dostane přes stdin (není vidět v seznamu procesů). Bez uloženého hesla se zeptá okno FreeRDP.")
+            PasswordSourceFields(m: m)
+            Text("FreeRDP dostane heslo přes stdin (není vidět v seznamu procesů). Bez hesla se zeptá okno FreeRDP.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         Section("Zobrazení") {
@@ -924,11 +923,7 @@ struct SessionEditor: View {
                 .disabled(m.session.identityFile.isEmpty)
             }
         case .password:
-            SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo",
-                        text: $m.password)
-            Toggle("Před použitím hesla vyžadovat Touch ID / heslo Macu", isOn: $m.session.requireUserAuth)
-            Text("Heslo je jen v Klíčence macOS, nikdy v souboru serverů ani v exportu.")
-                .font(.caption).foregroundStyle(.secondary)
+            PasswordSourceFields(m: m)
         case .interactive:
             Text("Heslo nebo jednorázový kód zadáš v terminálu při každém připojení. Nic se neukládá.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -1083,4 +1078,60 @@ private struct GroupPickerPopover: View {
         m.session.group = groups.first { $0.caseInsensitiveCompare(norm) == .orderedSame } ?? norm
         m.showGroups = false
     }
+}
+
+/// Heslo: Klíčenka macOS, nebo odkaz do správce hesel (1Password / Bitwarden / KeePassXC).
+struct PasswordSourceFields: View {
+    @ObservedObject var m: SessionEditorModel
+    @StateObject private var test = PasswordTestState()
+
+    private var source: Binding<String> {
+        Binding(get: { ExternalSecrets.kind(of: m.session.passwordRef)?.rawValue ?? "" },
+                set: { new in
+                    if new.isEmpty { m.session.passwordRef = "" }
+                    else if ExternalSecrets.kind(of: m.session.passwordRef)?.rawValue != new { m.session.passwordRef = new }
+                    test.result = ""
+                })
+    }
+
+    var body: some View {
+        Picker("Zdroj hesla", selection: source) {
+            Text("Klíčenka macOS").tag("")
+            ForEach(ExternalSecrets.Kind.allCases) { Text($0.title).tag($0.rawValue) }
+        }
+        if let k = ExternalSecrets.kind(of: m.session.passwordRef) {
+            TextField("Odkaz", text: $m.session.passwordRef, prompt: Text(k.example))
+                .font(.system(.body, design: .monospaced))
+            HStack {
+                Button("Otestovat načtení") {
+                    let ref = m.session.passwordRef
+                    test.result = "Načítám…"
+                    Task.detached {
+                        let r = ExternalSecrets.fetch(ref)
+                        await MainActor.run {
+                            switch r {
+                            case .success(let p): test.result = "✓ Heslo načteno (\(p.count) znaků)"
+                            case .failure(let f): test.result = "✗ " + f.message
+                            }
+                        }
+                    }
+                }
+                Text(test.result).font(.caption).foregroundStyle(test.result.hasPrefix("✓") ? UI.ok : .secondary)
+                    .lineLimit(2)
+            }
+            Text(k.cli == nil ? "CLI nenalezeno – \(k.install)."
+                              : "Heslo se načte z \(k.title) až při připojení a nikam se neukládá. \(k == .onepassword ? "Ověření řeší aplikace 1Password (Touch ID)." : "Při připojení se zeptá na heslo k trezoru / databázi.")")
+                .font(.caption).foregroundStyle(k.cli == nil ? Color.orange : .secondary)
+        } else {
+            SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
+            Toggle("Před použitím hesla vyžadovat Touch ID / heslo Macu", isOn: $m.session.requireUserAuth)
+            Text("Heslo je jen v Klíčence macOS, nikdy v souboru serverů ani v exportu.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+@MainActor
+final class PasswordTestState: ObservableObject {
+    @Published var result = ""
 }

@@ -547,3 +547,22 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **Vlastní klient SSH** (Nastavení → Obecné → Klient SSH): místo `/usr/bin/ssh` lze použít např. Homebrew
   OpenSSH – pro případ, že systémové OpenSSH algoritmus úplně odstraní. Používá ho terminál, SFTP (`sftp -S`),
   monitor, tunely, Wireshark i test připojení. Zobrazí se verze (`ssh -V`).
+
+## 0.30.0
+
+- **Import serverů z jiných nástrojů** (Soubor → Importovat session…, lze vybrat více souborů najednou):
+  - **RDCMan** (`.rdg`) – skupiny → složky, servery jako RDP včetně uživatele a domény.
+  - **mRemoteNG** (`confCons.xml`) – kontejnery → složky; RDP, SSH, Telnet (ostatní protokoly se přeskočí;
+    soubor šifrovaný celý je potřeba exportovat bez šifrování).
+  - **iTerm2** (export profilů / Dynamic Profiles JSON) – profily s příkazem `ssh` / `telnet` (port, uživatel,
+    jump host, klíč), první tag = složka.
+  - **CSV** (oddělovač `,` nebo `;`) – sloupce host (povinný), name, port, user, protocol, folder, domain, notes, environment.
+  - **Soubory `.rdp`** – adresa, port, uživatel / doména, RD Gateway, rozlišení, více monitorů, schránka.
+  - Hesla se neimportují nikdy; vše prochází stejnou bezpečnostní kontrolou jako import JSON. XML bez externích entit (XXE).
+- **Externí správci hesel** (editor serveru → Zdroj hesla, SSH i RDP):
+  - **1Password** – `op://Trezor/Položka/password` (CLI `op`, ověření Touch ID v aplikaci 1Password).
+  - **Bitwarden** – `bw://<položka>` (CLI `bw`; master heslo se zeptá dialogem, nebo využije `BW_SESSION`).
+  - **KeePassXC** – `kpxc://<cesta k .kdbx>#<položka>` (`keepassxc-cli`; heslo databáze dialogem).
+  - Heslo se načte až při připojení, nikam se neukládá; tlačítko „Otestovat načtení“ ukáže jen délku hesla.
+  - Při importu se odkaz na správce hesel z bezpečnostních důvodů vynuluje (jinak by cizí profil po připojení
+    poslal tvoje heslo na cizí server).
