@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ApplicationServices
 import UniformTypeIdentifiers
 
 // Pozn.: místo @State používáme ObservableObject + @StateObject.
@@ -449,6 +450,7 @@ struct SessionEditor: View {
     @StateObject private var tester = ConnectionTester()
     @AppStorage("SSHTool.rdpCurtain") private var rdpCurtain = true
     @AppStorage("SSHTool.rdpToolbar") private var rdpToolbar = true
+    @AppStorage("SSHTool.rdpLiveDeclined") private var rdpLiveDeclined = false
     @Environment(\.dismiss) private var dismiss
     private let onSave: (SSHSession, String?) -> Void
     private let groups: [String]
@@ -809,6 +811,13 @@ struct SessionEditor: View {
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
             Toggle("Lišta relace po najetí myší nahoru (rozlišení, měřítko, celá obrazovka, odpojit)", isOn: $rdpToolbar)
+            if rdpToolbar {
+                Toggle("Rozlišení a celou obrazovku měnit bez přepojení", isOn: Binding(get: { !rdpLiveDeclined }, set: { rdpLiveDeclined = !$0 }))
+                Text(AXIsProcessTrusted()
+                     ? "Oprávnění Zpřístupnění je povolené – změny proběhnou v běžící relaci. Měřítko (DPI) se mění přepojením."
+                     : "Vyžaduje oprávnění Zpřístupnění (požádá o něj při první změně). Bez něj se relace přepojí.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         Section("Klávesnice a schránka") {
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)

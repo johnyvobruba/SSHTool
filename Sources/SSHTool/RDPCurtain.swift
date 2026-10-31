@@ -341,9 +341,32 @@ final class RDPSessionBar: NSObject {
 
     // MARK: Akce
 
+    // Živě (bez přepojení) jde jen u relace s dynamickým rozlišením a s oprávněním Zpřístupnění; jinak přepojení.
+    private var liveCapable: Bool { ["", "dynamic", "fullscreen"].contains(session.rdpSize) && !Self.keyToggleBroken }
+    private static var keyToggleBroken = false
+
+    private func canLive() -> Bool { liveCapable && RDPLive.ensureTrusted() }
+
+    /// Celá obrazovka ↔ okno zkratkou FreeRDP; po chvíli ověří výsledek, jinak přepojení.
+    private func liveToggle(expectFullscreen: Bool, then: (() -> Void)? = nil, fallback: @escaping () -> Void) {
+        RDPLive.toggleFullscreen(pid: pid)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self else { return }
+            self.refreshState()
+            if self.fullscreen == expectFullscreen { then?(); return }
+            Self.keyToggleBroken = true            // zkratka nezabrala → dál přepojovat
+            fallback()
+        }
+    }
+
     @objc private func toggleTapped() {
         hide()
-        if fullscreen { onWindowed?("dynamic") } else { onFullscreen?(screenName) }
+        let fb: () -> Void = { [weak self] in
+            guard let self else { return }
+            if self.fullscreen { self.onWindowed?("dynamic") } else { self.onFullscreen?(self.screenName) }
+        }
+        guard canLive() else { fb(); return }
+        liveToggle(expectFullscreen: !fullscreen, fallback: fb)
     }
 
     @objc private func ejectTapped() { hide(); onDisconnect?() }
@@ -377,7 +400,7 @@ final class RDPSessionBar: NSObject {
     @objc private func scaleMenu(_ sender: NSButton) {
         let m = NSMenu()
         for v in [0, 100, 125, 150, 175, 200] {
-            let it = NSMenuItem(title: v == 0 ? "Automaticky" : "\(v) %", action: #selector(pickScale(_:)), keyEquivalent: "")
+            let it = NSMenuItem(title: (v == 0 ? "Automaticky" : "\(v) %") + "  (přepojí)", action: #selector(pickScale(_:)), keyEquivalent: "")
             it.target = self; it.tag = v
             it.state = session.rdpScale == v ? .on : .off
             m.addItem(it)
@@ -393,23 +416,51 @@ final class RDPSessionBar: NSObject {
 
     @objc private func pickSize(_ it: NSMenuItem) {
         guard let v = it.representedObject as? String else { return }
-        hide(); onWindowed?(v)
+        hide()
+        let fb: () -> Void = { [weak self] in self?.onWindowed?(v) }
+        guard canLive() else { fb(); return }
+        let screen = NSScreen.screens.first { $0.localizedName == screenName }
+        let resize: () -> Void = { [weak self] in
+            guard let self else { return }
+            let p = v.split(separator: "x").compactMap { Double($0) }
+            guard p.count == 2 else { return }                       // „dynamic“ = jen přepnout do okna
+            if !RDPLive.resize(pid: self.pid, width: p[0], height: p[1], on: screen) { fb() }
+        }
+        if fullscreen { liveToggle(expectFullscreen: false, then: resize, fallback: fb) } else { resize() }
     }
+
     @objc private func pickScreen(_ it: NSMenuItem) {
         guard let v = it.representedObject as? String else { return }
-        hide(); onFullscreen?(v)
+        hide()
+        let fb: () -> Void = { [weak self] in self?.onFullscreen?(v) }
+        guard canLive(), let target = NSScreen.screens.first(where: { $0.localizedName == v }) else { fb(); return }
+        if fullscreen && v == screenName { return }
+        let goFull: () -> Void = { [weak self] in
+            guard let self else { return }
+            if v != self.screenName { RDPLive.move(pid: self.pid, to: target) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.liveToggle(expectFullscreen: true, fallback: fb)
+            }
+        }
+        if fullscreen { liveToggle(expectFullscreen: false, then: goFull, fallback: fb) } else { goFull() }
     }
     @objc private func pickScale(_ it: NSMenuItem) { hide(); onScale?(it.tag) }
 
     // MARK: Zobrazení po najetí myší
 
-    private func update() {
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-              let r = Self.mainWindow(pid: pid), let primary = NSScreen.screens.first else { hide(); return }
+    /// Poloha okna relace, monitor a zda je celá obrazovka. nil = okno teď není vidět.
+    @discardableResult
+    private func refreshState() -> NSRect? {
+        guard let r = Self.mainWindow(pid: pid), let primary = NSScreen.screens.first else { return nil }
         let frame = NSRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)  // CG → AppKit
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: frame.midX, y: frame.midY)) }
         screenName = screen?.localizedName
         fullscreen = screen.map { frame.width >= $0.frame.width - 2 && frame.height >= $0.frame.height * 0.9 } ?? false
+        return frame
+    }
+
+    private func update() {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid, let frame = refreshState() else { hide(); return }
         toggle.title = fullscreen ? "Okno" : "Celá obrazovka"
         toggle.image = NSImage(systemSymbolName: fullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                accessibilityDescription: toggle.title)

@@ -639,3 +639,15 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Odpojit:** ukončí relaci, aplikace ve Windows běží dál.
   - Změny se provedou přepojením relace, Windows relace a otevřené aplikace zůstanou.
   - Lištu jde vypnout v editoru RDP serveru.
+
+## 0.35.0
+
+- **RDP – změny bez přepojení**: lišta relace mění velikost a režim přímo v běžící relaci, Windows dostanou nové rozlišení hned.
+  - **Celá obrazovka ↔ okno:** zkratka FreeRDP (pravý ⇧ + Enter) poslaná přímo procesu FreeRDP.
+  - **Rozlišení:** změna velikosti okna relace. FreeRDP s dynamickým rozlišením pošle Windows nové rozlišení přes kanál Display Control.
+  - **Celá obrazovka na jiném monitoru:** přesun okna a přepnutí.
+  - Relace spuštěné na celou obrazovku mají nově i dynamické rozlišení, takže přepnutí do okna rozlišení přizpůsobí.
+  - Vyžaduje oprávnění macOS **Zpřístupnění**; SSHTool o něj požádá při první změně. Bez oprávnění, nebo když zkratka nezabere, se relace přepojí jako dosud.
+  - **Měřítko (DPI)** běžný FreeRDP za běhu měnit neumí, proto dál přepojuje (v menu je označené).
+  - Volba v editoru RDP serveru: *Rozlišení a celou obrazovku měnit bez přepojení*.
+  - Po přepnutí relace do okna už přesun okna na jiný monitor relaci nepřepojí.

@@ -116,7 +116,10 @@ enum FreeRDP {
         if !s.user.isEmpty { a.append("/u:\(s.user)") }
         if !s.rdpDomain.isEmpty { a.append("/d:\(s.rdpDomain)") }
         switch s.rdpSize {
-        case "fullscreen": a.append("/f")
+        case "fullscreen":
+            // + dynamické rozlišení: přepnutí do okna (lišta / pravý ⇧+Enter) pak změní rozlišení bez přepojení
+            a.append("/f")
+            if !s.rdpMultiMon { a.append("/dynamic-resolution") }
         case "dynamic", "":
             a.append("/dynamic-resolution")
             if let size = initialSize { a.append("/size:\(size)") }
@@ -626,6 +629,12 @@ final class RDPLauncher: ObservableObject {
 
     private func tick(_ s: SSHSession, pid: Int32) {
         guard let w = watches[s.id], w.pid == pid, w.ready.value else { return }
+        // relace přepnutá živě do okna (lišta / pravý ⇧+Enter): přesun okna nepřepojovat
+        if let r = RDPSessionBar.mainWindow(pid: pid), let primary = NSScreen.screens.first {
+            let f = NSRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)
+            let sc = NSScreen.screens.first { $0.frame.contains(NSPoint(x: f.midX, y: f.midY)) }
+            if let sc, f.width < sc.frame.width - 2 || f.height < sc.frame.height * 0.9 { pendingScreen[s.id] = nil; return }
+        }
         guard let name = Self.screenOfWindow(pid: pid) else { return }
         guard let current = currentScreen[s.id] else { currentScreen[s.id] = name; return }
         if name == current { pendingScreen[s.id] = nil; return }
