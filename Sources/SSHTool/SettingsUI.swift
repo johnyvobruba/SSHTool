@@ -421,6 +421,7 @@ struct SettingsGeneralPane: View {
 
 struct SettingsAppearancePane: View {
     @EnvironmentObject private var store: AppStore
+    @AppStorage("SSHTool.themedIcon") private var themedIcon = true
 
     var body: some View {
         SKSection("Barevný profil aplikace",
@@ -445,6 +446,13 @@ struct SettingsAppearancePane: View {
                     SKMenuPicker(selection: $store.settings.terminalThemeID,
                                  options: Theme.all.map { ($0.id, $0.name) })
                 }
+            }
+        }
+        SKSection("Ikona aplikace") {
+            SKRow("Ikona v Docku podle profilu",
+                  help: "Barvy ikony v Docku a v přepínači ⌘Tab odpovídají vybranému profilu. Finder a Launchpad ukazují původní ikonu.",
+                  first: true) {
+                SKToggle(isOn: Binding(get: { themedIcon }, set: { themedIcon = $0; ThemedIcon.apply() }))
             }
         }
         SKSection("Automatický vzhled") {

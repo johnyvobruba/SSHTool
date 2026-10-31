@@ -329,6 +329,10 @@ struct ServerContextMenu: View {
             }
         }
         if RDPLauncher.shared.isRunning(session.id) {
+            Button("Celá obrazovka (přepojit)") {
+                RDPLauncher.shared.reconnect(session, monitor: FreeRDP.targetScreen(session)?.localizedName)
+            }
+            Button("V okně (přepojit)") { RDPLauncher.shared.reconnectWindowed(session) }
             Button("Odpojit") { RDPLauncher.shared.disconnect(session.id) }
         }
         Divider()
@@ -444,6 +448,7 @@ struct SessionEditor: View {
     @StateObject private var m: SessionEditorModel
     @StateObject private var tester = ConnectionTester()
     @AppStorage("SSHTool.rdpCurtain") private var rdpCurtain = true
+    @AppStorage("SSHTool.rdpToolbar") private var rdpToolbar = true
     @Environment(\.dismiss) private var dismiss
     private let onSave: (SSHSession, String?) -> Void
     private let groups: [String]
@@ -803,6 +808,7 @@ struct SessionEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
+            Toggle("Lišta „Celá obrazovka“ v titulku okna relace", isOn: $rdpToolbar)
         }
         Section("Klávesnice a schránka") {
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)

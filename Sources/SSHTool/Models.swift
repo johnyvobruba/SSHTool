@@ -512,6 +512,7 @@ final class AppStore: ObservableObject {
         ThemeStore.terminal = r.terminal
         themeKey = key
         NotificationCenter.default.post(name: ThemeStore.changed, object: nil)
+        ThemedIcon.apply(r.ui)
     }
 
     var isDarkUI: Bool { ThemeStore.ui.isDark }

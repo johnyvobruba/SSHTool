@@ -616,3 +616,15 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **RDP – panel průběhu zmizí, jakmile se otevře okno relace**: FreeRDP píše výpis přes rouru s bufferem, takže zprávy do SSHTool přicházejí se zpožděním (i minuty). Panel proto sleduje okna procesu FreeRDP (CGWindowList, bez zvláštních oprávnění).
   - Panel zmizí, když je okno relace (alespoň 640 × 400) vidět asi 1 s.
   - Menší připojovací a chybové dialogy FreeRDP panel nezavřou.
+
+## 0.33.0
+
+- **RDP – na celou obrazovku přímo z okna relace**: v titulku okna RDP (relace v okně) je malá lišta *Celá obrazovka* a *⏏ Odpojit*.
+  - Lišta je vidět, jen když je okno RDP aktivní.
+  - Celá obrazovka relaci přepojí na monitor, na kterém okno je, v jeho rozlišení. Windows relace a otevřené aplikace zůstanou.
+  - Zpět do okna: pravé tlačítko na serveru → *V okně (přepojit)*.
+  - V kontextovém menu serveru je i *Celá obrazovka (přepojit)*.
+  - Lištu jde vypnout v editoru RDP serveru.
+- **Ikona aplikace podle barevného profilu**: ikona v Docku a v přepínači ⌘Tab se přebarví podle zvoleného profilu (pozadí, okno terminálu a zámek SSH v barvě zvýraznění). Midnight Graphite má původní ikonu.
+  - Finder a Launchpad dál ukazují ikonu z balíčku; macOS za běhu mění jen ikonu v Docku.
+  - Vypnout jde v Nastavení → Vzhled → Ikona aplikace.

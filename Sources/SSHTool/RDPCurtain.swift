@@ -252,3 +252,113 @@ final class RDPProgress: NSObject {
         }, completionHandler: { p.orderOut(nil) })
     }
 }
+
+/// Malá lišta v titulku okna RDP relace (okno, ne celá obrazovka): ⛶ Celá obrazovka a ⏏ Odpojit.
+/// Je to okno SSHTool, které sleduje polohu okna FreeRDP (CGWindowList) a je vidět jen, když je FreeRDP
+/// aktivní aplikace. Kliknutí FreeRDP neaktivuje SSHTool (neaktivující panel).
+@MainActor
+final class RDPWindowBar: NSObject {
+    static var enabled: Bool { UserDefaults.standard.object(forKey: "SSHTool.rdpToolbar") as? Bool ?? true }
+
+    private let panel: NSPanel
+    private var timer: Timer?
+    let pid: Int32
+    private var screenName: String?
+    private var shown = false
+    var onFullscreen: ((String?) -> Void)?
+    var onDisconnect: (() -> Void)?
+    private static let size = NSSize(width: 150, height: 22)
+
+    init(pid: Int32) {
+        self.pid = pid
+        panel = NSPanel(contentRect: NSRect(origin: .zero, size: Self.size),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle]
+
+        let fx = NSVisualEffectView(frame: NSRect(origin: .zero, size: Self.size))
+        fx.material = .hudWindow
+        fx.blendingMode = .behindWindow
+        fx.state = .active
+        fx.wantsLayer = true
+        fx.layer?.cornerRadius = 6
+        fx.layer?.masksToBounds = true
+        fx.appearance = NSAppearance(named: .darkAqua)
+        let full = Self.button("Celá obrazovka", "arrow.up.left.and.arrow.down.right", target: self, action: #selector(fullTapped))
+        let eject = Self.button(nil, "eject", target: self, action: #selector(ejectTapped))
+        full.toolTip = "Přepojit na celou obrazovku tohoto monitoru (Windows relace a aplikace zůstanou)"
+        eject.toolTip = "Odpojit relaci"
+        let row = NSStackView(views: [full, eject])
+        row.orientation = .horizontal
+        row.spacing = 2
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 4)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        fx.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: fx.leadingAnchor), row.trailingAnchor.constraint(equalTo: fx.trailingAnchor),
+            row.centerYAnchor.constraint(equalTo: fx.centerYAnchor),
+        ])
+        panel.contentView = fx
+        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { self?.update() }
+        }
+    }
+
+    private static func button(_ title: String?, _ symbol: String, target: AnyObject, action: Selector) -> NSButton {
+        let b = NSButton(title: title ?? "", target: target, action: action)
+        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title ?? symbol)
+        b.imagePosition = title == nil ? .imageOnly : .imageLeading
+        b.isBordered = false
+        b.font = .systemFont(ofSize: 11, weight: .medium)
+        b.contentTintColor = NSColor(white: 0.92, alpha: 1)
+        b.controlSize = .small
+        return b
+    }
+
+    @objc private func fullTapped() { onFullscreen?(screenName) }
+    @objc private func ejectTapped() { onDisconnect?() }
+
+    private func update() {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+              let r = Self.mainWindow(pid: pid), let primary = NSScreen.screens.first else { hide(); return }
+        // CG (vlevo nahoře) → AppKit (vlevo dole)
+        let frame = NSRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)
+        let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: frame.midX, y: frame.midY)) }
+        screenName = screen?.localizedName
+        // celá obrazovka / příliš malé okno → lišta není potřeba
+        if let sc = screen, frame.width >= sc.frame.width - 2, frame.height >= sc.frame.height * 0.9 { hide(); return }
+        guard frame.width > Self.size.width + 160 else { hide(); return }
+        let titlebar: CGFloat = 28
+        panel.setFrameOrigin(NSPoint(x: frame.maxX - Self.size.width - 10,
+                                     y: frame.maxY - titlebar + (titlebar - Self.size.height) / 2))
+        if !shown { panel.orderFrontRegardless(); shown = true }
+    }
+
+    private func hide() { if shown { panel.orderOut(nil); shown = false } }
+
+    /// Největší běžné okno procesu (v CG souřadnicích).
+    static func mainWindow(pid: Int32) -> CGRect? {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return nil }
+        var best: CGRect?
+        for w in info {
+            guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
+                  (w[kCGWindowLayer as String] as? Int) == 0,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b as CFDictionary), r.width >= 400, r.height >= 300 else { continue }
+            if best == nil || r.width * r.height > best!.width * best!.height { best = r }
+        }
+        return best
+    }
+
+    func close() {
+        timer?.invalidate(); timer = nil
+        panel.orderOut(nil)
+    }
+}

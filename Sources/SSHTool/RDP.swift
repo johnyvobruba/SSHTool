@@ -167,6 +167,8 @@ final class RDPLauncher: ObservableObject {
     private var curtains: [UUID: RDPCurtain] = [:]
     /// Panel s průběhem připojování (fáze, čas, pokus) – viz RDPProgress.
     private var progress: [UUID: RDPProgress] = [:]
+    /// Lišta „Celá obrazovka / Odpojit“ v titulku okna relace (jen relace v okně).
+    private var bars: [UUID: RDPWindowBar] = [:]
 
     private func endProgress(_ id: UUID) { progress[id]?.close(); progress[id] = nil }
 
@@ -410,6 +412,7 @@ final class RDPLauncher: ObservableObject {
             DispatchQueue.main.async {
                 if self.running[id] === proc { self.running[id] = nil }
                 if let c = self.curtains[id], c.ownerPID == proc.processIdentifier { c.close(); self.curtains[id] = nil }
+                if let b = self.bars[id], b.pid == proc.processIdentifier { b.close(); self.bars[id] = nil }
                 self.stopWatch(id, pid: proc.processIdentifier)
                 let byUser = self.stopping.remove(id) != nil
                 self.onChange?()
@@ -493,6 +496,13 @@ final class RDPLauncher: ObservableObject {
         try? inPipe.fileHandleForWriting.close()
         curtains[s.id]?.attach(pid: p.processIdentifier, loggedOn: loggedOn)
         progress[s.id]?.attach(pid: p.processIdentifier)
+        bars[s.id]?.close(); bars[s.id] = nil
+        if RDPWindowBar.enabled, s.rdpSize != "fullscreen", !s.rdpMultiMon {
+            let bar = RDPWindowBar(pid: p.processIdentifier)
+            bar.onFullscreen = { [weak self] screen in self?.reconnect(s, monitor: screen ?? NSScreen.main?.localizedName) }
+            bar.onDisconnect = { [weak self] in self?.disconnect(sid) }
+            bars[s.id] = bar
+        }
         running[s.id] = p
         onChange?()
         if s.rdpSize == "fullscreen", !s.rdpMultiMon, s.rdpAutoMonitor {
@@ -547,6 +557,14 @@ final class RDPLauncher: ObservableObject {
         p.terminate()
         // již potvrzeno (PROD) – bez dalších dotazů
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.launch(t, confirmed: true) }
+    }
+
+    /// Přepojí relaci z celé obrazovky do okna (dynamické rozlišení podle velikosti okna).
+    func reconnectWindowed(_ s: SSHSession) {
+        var t = s
+        t.rdpSize = "dynamic"
+        t.rdpMultiMon = false
+        reconnect(t, monitor: nil)
     }
 
     /// Změna měřítka (DPI) ve Windows – uloží se k serveru a běžící relace se přepojí.
