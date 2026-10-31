@@ -658,3 +658,8 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Na displeji s výřezem je lišta automaticky vpravo vedle výřezu.
   - Tlačítkem ⋯ na liště jde zvolit umístění: vlevo, uprostřed nebo vpravo; volba se pamatuje.
   - Uprostřed, nebo když se lišta vedle výřezu nevejde, se posune pod výřez.
+
+## 0.35.2
+
+- **RDP v celé obrazovce – panel průběhu nezmizel** („Ověřování certifikátu serveru…“ běžel dál): okno FreeRDP v celé obrazovce má vyšší vrstvu než běžná okna a detekce ho přehlížela. Teď se panel zavře i v celé obrazovce.
+- **Menu lišty u horního okraje** (výřez displeje): menu se otevírá níž, aby ho macOS neodroloval a byla vidět i první položka.

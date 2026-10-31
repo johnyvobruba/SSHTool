@@ -217,8 +217,8 @@ final class RDPProgress: NSObject {
         guard pid > 0, let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]] else { return false }
         for w in info {
+            // bez filtru na vrstvu: okno FreeRDP v celé obrazovce má vyšší vrstvu než běžná okna
             guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
-                  (w[kCGWindowLayer as String] as? Int) == 0,
                   let b = w[kCGWindowBounds as String] as? NSDictionary,
                   let r = CGRect(dictionaryRepresentation: b as CFDictionary) else { continue }
             if r.width >= 640 && r.height >= 400 { return true }     // připojovací/chybový dialog FreeRDP je menší
@@ -433,7 +433,8 @@ final class RDPSessionBar: NSObject {
 
     private func popUp(_ m: NSMenu, from sender: NSButton) {
         lastInside = Date()
-        m.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 6), in: sender)
+        // menu pod lištou; u horního okraje (výřez / skrytý řádek nabídek) víc místa, jinak macOS menu „odroluje“
+        m.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + (fullscreen ? 16 : 6)), in: sender)
         lastInside = Date()                          // po zavření menu lištu hned neschovávat
     }
 
