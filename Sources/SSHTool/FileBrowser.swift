@@ -278,11 +278,21 @@ final class SFTPBrowser: ObservableObject {
     }
 
     /// ↓ Stáhnout: jeden soubor → dialog Uložit, více položek / složka → výběr cílové složky.
-    func download(_ items: [Entry]) {
+    func download(_ items: [Entry], to dir: URL? = nil, then: (() -> Void)? = nil) {
         guard !items.isEmpty else { return }
         var targetDir: URL
         var single: URL?
-        if items.count == 1, !items[0].isDir {
+        if let dir {
+            targetDir = dir
+            let clash = items.map(\.name).filter { FileManager.default.fileExists(atPath: dir.appendingPathComponent($0).path) }
+            if !clash.isEmpty {
+                let a = NSAlert()
+                a.messageText = "Přepsat existující soubory na Macu?"
+                a.informativeText = clash.prefix(10).joined(separator: "\n")
+                a.addButton(withTitle: "Přepsat"); a.addButton(withTitle: "Zrušit")
+                guard a.runModal() == .alertFirstButtonReturn else { return }
+            }
+        } else if items.count == 1, !items[0].isDir {
             let panel = NSSavePanel()
             panel.title = "Stáhnout ze serveru \(sessionName)"
             panel.nameFieldStringValue = items[0].name
@@ -320,6 +330,7 @@ final class SFTPBrowser: ObservableObject {
             let r = await run(cmds, pid: pid)
             let reveal = single ?? (items.count == 1 ? targetDir.appendingPathComponent(items[0].name) : targetDir)
             finish(id, r.ok, r.ok ? "Uloženo do \(targetDir.path)" : Self.cleanErr(r.err), reveal: r.ok ? reveal : nil)
+            then?()
         }
     }
 
@@ -335,7 +346,7 @@ final class SFTPBrowser: ObservableObject {
         upload(panel.urls)
     }
 
-    func upload(_ urls: [URL]) {
+    func upload(_ urls: [URL], then: (() -> Void)? = nil) {
         guard !urls.isEmpty, confirmWrite("Nahrát \(urls.count == 1 ? "„\(urls[0].lastPathComponent)“" : "\(urls.count) položek") do \(path)") else { return }
         let existing = Set(entries.map(\.name))
         let clash = urls.map(\.lastPathComponent).filter { existing.contains($0) }
@@ -356,6 +367,7 @@ final class SFTPBrowser: ObservableObject {
             let r = await run(cmds, pid: pid)
             finish(id, r.ok, r.ok ? "Nahráno do \(dir)" : Self.cleanErr(r.err))
             if r.ok, path == dir { await list(dir) }
+            then?()
         }
     }
 
@@ -413,6 +425,101 @@ final class SFTPBrowser: ObservableObject {
     }
 
     func clearFinished() { transfers.removeAll { $0.state != .running } }
+
+    // MARK: Úprava souboru na serveru (otevřít v editoru na Macu, uložení = nahrání zpět)
+
+    struct EditSession: Identifiable {
+        let id = UUID()
+        let remotePath: String
+        let local: URL
+        var lastMod: Date
+        var status: String
+        var confirmed: Bool
+    }
+    @Published private(set) var edits: [EditSession] = []
+    private var watching = false
+
+    nonisolated static var editRoot: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("SSHTool/edit", isDirectory: true)
+    }
+
+    /// Smaže pracovní kopie starší než den (např. po pádu aplikace) – volá se při spuštění.
+    nonisolated static func cleanupEditCopies() {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: editRoot, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        let limit = Date().addingTimeInterval(-86_400)
+        for u in items where ((try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date()) < limit {
+            try? fm.removeItem(at: u)
+        }
+    }
+
+    func edit(_ e: Entry) {
+        guard !e.isDir else { return }
+        guard e.size <= 20 * 1_048_576 else {
+            let a = NSAlert(); a.messageText = "Soubor je příliš velký na úpravy (\(ByteCountFormatter.string(fromByteCount: e.size, countStyle: .file)))"
+            a.informativeText = "Úpravy jsou určené pro konfigurace a skripty do 20 MB. Větší soubor stáhni a nahraj ručně."; a.runModal(); return
+        }
+        let remote = Self.join(path, e.name)
+        if let ex = edits.first(where: { $0.remotePath == remote }) { NSWorkspace.shared.open(ex.local); return }
+        let fm = FileManager.default
+        let dir = Self.editRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try fm.createDirectory(at: Self.editRoot, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        } catch let err { self.error = "Nelze vytvořit pracovní složku: \(err.localizedDescription)"; return }
+        let local = dir.appendingPathComponent(e.name)
+        Task {
+            let r = await run(["get -p " + Self.q(remote) + " " + Self.q(local.path)])
+            guard r.ok else { error = Self.cleanErr(r.err); try? fm.removeItem(at: dir); return }
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: local.path)
+            let mod = (try? fm.attributesOfItem(atPath: local.path))?[.modificationDate] as? Date ?? Date()
+            edits.append(EditSession(remotePath: remote, local: local, lastMod: mod, status: "Otevřeno – uložení v editoru = nahrání na server", confirmed: !production))
+            if !NSWorkspace.shared.open(local) {
+                // bez přiřazené aplikace (např. .conf) → TextEdit
+                let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open"); p.arguments = ["-t", local.path]
+                try? p.run()
+            }
+            watchEdits()
+        }
+    }
+
+    func stopEditing(_ id: UUID) {
+        guard let i = edits.firstIndex(where: { $0.id == id }) else { return }
+        try? FileManager.default.removeItem(at: edits[i].local.deletingLastPathComponent())
+        edits.remove(at: i)
+    }
+
+    func reopen(_ id: UUID) { if let e = edits.first(where: { $0.id == id }) { NSWorkspace.shared.open(e.local) } }
+
+    /// Každou sekundu kontroluje uložení pracovních kopií; změnu nahraje zpět na server.
+    private func watchEdits() {
+        guard !watching else { return }
+        watching = true
+        Task { @MainActor in
+            defer { watching = false }
+            while !edits.isEmpty {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                for e in edits {
+                    guard let mod = (try? FileManager.default.attributesOfItem(atPath: e.local.path))?[.modificationDate] as? Date,
+                          mod > e.lastMod, let i = edits.firstIndex(where: { $0.id == e.id }) else { continue }
+                    edits[i].lastMod = mod
+                    if !edits[i].confirmed {
+                        guard confirmWrite("Nahrát upravený „\((e.remotePath as NSString).lastPathComponent)“ zpět na server") else {
+                            edits[i].status = "Uložení na server zrušeno"; continue
+                        }
+                        edits[i].confirmed = true
+                    }
+                    edits[i].status = "Nahrávám…"
+                    let r = await run(["put -p " + Self.q(e.local.path) + " " + Self.q(e.remotePath)])
+                    let t = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+                    if let j = edits.firstIndex(where: { $0.id == e.id }) {
+                        edits[j].status = r.ok ? "✓ Uloženo na server \(t)" : "✗ " + Self.cleanErr(r.err)
+                    }
+                    if r.ok, (e.remotePath as NSString).deletingLastPathComponent == path { await list(path) }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Panel
@@ -420,6 +527,7 @@ final class SFTPBrowser: ObservableObject {
 struct FileBrowserPanel: View {
     @ObservedObject var b: SFTPBrowser
     var embedded = false                // součást SFTP záložky (bez tlačítka zavřít)
+    var localTarget: LocalBrowser? = nil   // dvoupanelový režim: levý panel s Macem
     @EnvironmentObject private var tabs: TabManager
 
     private var selected: [SFTPBrowser.Entry] { b.visibleEntries.filter { b.selection.contains($0.id) } }
@@ -456,6 +564,11 @@ struct FileBrowserPanel: View {
                 tool("arrow.clockwise", "Obnovit") { b.refresh() }
                 Divider().frame(height: 16).padding(.horizontal, 4)
                 tool("arrow.up.doc", "↑ Nahrát soubory z Macu do této složky") { b.chooseUpload() }
+                if let local = localTarget {
+                    tool("arrow.left.square", "← Stáhnout vybrané do levého panelu (\(local.dir.path))", disabled: selected.isEmpty) {
+                        b.download(selected, to: local.dir, then: { local.reload() })
+                    }
+                }
                 tool("arrow.down.doc", "↓ Stáhnout vybrané do Macu", disabled: selected.isEmpty) { b.download(selected) }
                 tool("folder.badge.plus", "Nová složka") { b.mkdir() }
                 tool("trash", "Smazat vybrané", disabled: selected.isEmpty) { b.delete(selected) }
@@ -515,6 +628,12 @@ struct FileBrowserPanel: View {
                     Button("Obnovit") { b.refresh() }
                 } else {
                     if items.count == 1, items[0].isDir || items[0].isLink { Button("Otevřít") { b.open(items[0]) } }
+                    if items.count == 1, !items[0].isDir, !items[0].isLink {
+                        Button("Upravit v editoru (uložení = nahrání zpět)") { b.edit(items[0]) }
+                    }
+                    if let local = localTarget {
+                        Button("← Stáhnout do levého panelu") { b.download(items, to: local.dir, then: { local.reload() }) }
+                    }
                     Button("↓ Stáhnout…") { b.download(items) }
                     if items.count == 1 {
                         Button("Kopírovat cestu") { b.copyPath(items[0]) }
@@ -543,6 +662,29 @@ struct FileBrowserPanel: View {
                 return true
             }
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(UI.accent, lineWidth: b.dropTargeted ? 2 : 0))
+
+            // upravované soubory
+            if !b.edits.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Upravované soubory").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(UI.textSecondary)
+                    ForEach(b.edits) { e in
+                        HStack(spacing: 6) {
+                            Image(systemName: "pencil.circle").foregroundStyle(UI.accent)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(e.remotePath).lineLimit(1).truncationMode(.head)
+                                Text(e.status).font(.system(size: 10)).foregroundStyle(e.status.hasPrefix("✗") ? UI.error : UI.textSecondary)
+                            }
+                            Spacer(minLength: 4)
+                            Button("Otevřít") { b.reopen(e.id) }.buttonStyle(.plain).foregroundStyle(UI.accent)
+                            Button("Ukončit") { b.stopEditing(e.id) }.buttonStyle(.plain).foregroundStyle(UI.textSecondary)
+                                .help("Přestat sledovat a smazat pracovní kopii na Macu")
+                        }
+                        .font(.system(size: 11))
+                    }
+                }
+                .padding(8)
+                .background(UI.chrome)
+            }
 
             // přenosy
             if !b.transfers.isEmpty {
@@ -647,5 +789,156 @@ enum FDProgress {
             }
         }
         return total
+    }
+}
+
+// MARK: - Dvoupanelový režim: levý panel se soubory Macu
+
+@MainActor
+final class LocalBrowser: ObservableObject {
+    struct Item: Identifiable, Hashable {
+        let url: URL
+        let isDir: Bool
+        let size: Int64
+        let date: Date?
+        var id: String { url.lastPathComponent }
+        var name: String { url.lastPathComponent }
+    }
+    @Published private(set) var dir: URL
+    @Published private(set) var items: [Item] = []
+    @Published var selection = Set<String>()
+    @Published var showHidden = false { didSet { reload() } }
+    @Published var pathField = ""
+
+    init() {
+        dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
+        reload()
+    }
+
+    func go(_ u: URL) { dir = u.standardizedFileURL; selection = []; reload() }
+    func up() { go(dir.deletingLastPathComponent()) }
+    func home() { go(URL(fileURLWithPath: NSHomeDirectory())) }
+    func goToField() {
+        let p = (pathField.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: p, isDirectory: &isDir), isDir.boolValue { go(URL(fileURLWithPath: p)) }
+    }
+
+    func reload() {
+        pathField = (dir.path as NSString).abbreviatingWithTildeInPath
+        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .isHiddenKey]
+        let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys,
+                                                                 options: showHidden ? [] : [.skipsHiddenFiles])) ?? []
+        items = urls.map { u in
+            let v = try? u.resourceValues(forKeys: Set(keys))
+            return Item(url: u, isDir: v?.isDirectory ?? false, size: Int64(v?.fileSize ?? 0), date: v?.contentModificationDate)
+        }
+        .sorted { a, b in a.isDir != b.isDir ? a.isDir : a.name.localizedStandardCompare(b.name) == .orderedAscending }
+    }
+
+    var selectedURLs: [URL] { items.filter { selection.contains($0.id) }.map(\.url) }
+}
+
+struct LocalFilePane: View {
+    @ObservedObject var l: LocalBrowser
+    @ObservedObject var b: SFTPBrowser
+
+    private static let df: DateFormatter = { let f = DateFormatter(); f.dateFormat = "d. M. yyyy HH:mm"; return f }()
+
+    private func tool(_ icon: String, _ help: String, disabled: Bool = false, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: icon).font(.system(size: 12)).frame(width: 24, height: 22) }
+            .buttonStyle(.plain).foregroundStyle(disabled ? UI.textTertiary : UI.text)
+            .disabled(disabled).help(help)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "laptopcomputer").foregroundStyle(UI.accent)
+                Text("Mac").font(.system(size: 12, weight: .semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 10).frame(height: 30).background(UI.chrome)
+            HStack(spacing: 2) {
+                tool("arrow.up", "O úroveň výš", disabled: l.dir.path == "/") { l.up() }
+                tool("house", "Domovská složka") { l.home() }
+                tool("arrow.clockwise", "Obnovit") { l.reload() }
+                Divider().frame(height: 16).padding(.horizontal, 4)
+                tool("arrow.right.square", "Nahrát vybrané → do \(b.path)", disabled: l.selection.isEmpty) {
+                    b.upload(l.selectedURLs)
+                }
+                tool("folder", "Zobrazit ve Finderu") { NSWorkspace.shared.activateFileViewerSelecting([l.dir]) }
+                Spacer()
+                Toggle(isOn: $l.showHidden) { Image(systemName: "eye") }
+                    .toggleStyle(.button).controlSize(.small).help("Zobrazit skryté soubory")
+            }
+            .padding(.horizontal, 6).frame(height: 30)
+            TextField("~/cesta", text: $l.pathField).textFieldStyle(.plain)
+                .font(.system(size: 11.5, design: .monospaced))
+                .onSubmit { l.goToField() }
+                .padding(.horizontal, 8).frame(height: 26)
+                .background(RoundedRectangle(cornerRadius: 6).fill(UI.app))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(UI.border, lineWidth: 1))
+                .padding(.horizontal, 8).padding(.bottom, 6)
+            Table(l.items, selection: $l.selection) {
+                TableColumn("Název") { i in
+                    HStack(spacing: 5) {
+                        Image(systemName: i.isDir ? "folder.fill" : "doc")
+                            .foregroundStyle(i.isDir ? UI.accent : UI.textSecondary).font(.system(size: 11))
+                        Text(i.name).lineLimit(1).truncationMode(.middle)
+                    }
+                    .onDrag { NSItemProvider(object: i.url as NSURL) }        // přetažení do pravého panelu = nahrát
+                }
+                TableColumn("Velikost") { i in
+                    Text(i.isDir ? "—" : ByteCountFormatter.string(fromByteCount: i.size, countStyle: .file))
+                        .foregroundStyle(UI.textSecondary).monospacedDigit()
+                }
+                .width(min: 50, ideal: 64, max: 90)
+                TableColumn("Změněno") { i in Text(i.date.map { Self.df.string(from: $0) } ?? "").foregroundStyle(UI.textSecondary) }
+                    .width(min: 70, ideal: 110, max: 140)
+            }
+            .font(.system(size: 11.5))
+            .contextMenu(forSelectionType: String.self) { ids in
+                let sel = l.items.filter { ids.contains($0.id) }
+                if !sel.isEmpty {
+                    Button("Nahrát → do \(b.path)") { b.upload(sel.map(\.url)) }
+                    Button("Zobrazit ve Finderu") { NSWorkspace.shared.activateFileViewerSelecting(sel.map(\.url)) }
+                }
+            } primaryAction: { ids in
+                if let i = l.items.first(where: { ids.contains($0.id) }) {
+                    if i.isDir { l.go(i.url) } else { NSWorkspace.shared.open(i.url) }
+                }
+            }
+            Text("Dvojklik = otevřít · přetažením do pravého panelu nahraješ na server")
+                .font(.system(size: 9.5)).foregroundStyle(UI.textTertiary).padding(.vertical, 4)
+        }
+        .background(UI.sidebar)
+    }
+}
+
+/// SFTP záložka: volitelně dvoupanelová (Mac vlevo, server vpravo).
+struct DualFileBrowser: View {
+    @ObservedObject var b: SFTPBrowser
+    @StateObject private var local = LocalBrowser()
+    @AppStorage("SSHTool.sftpDualPane") private var dual = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Toggle(isOn: $dual) { Label("Dva panely", systemImage: "rectangle.split.2x1") }
+                    .toggleStyle(.button).controlSize(.small)
+                    .help("Vlevo soubory Macu, vpravo server – přenosy tlačítky nebo přetažením")
+            }
+            .padding(.horizontal, 8).padding(.vertical, 3).background(UI.chrome)
+            if dual {
+                HSplitView {
+                    LocalFilePane(l: local, b: b).frame(minWidth: 260)
+                    FileBrowserPanel(b: b, embedded: true, localTarget: local).frame(minWidth: 320)
+                }
+            } else {
+                FileBrowserPanel(b: b, embedded: true)
+            }
+        }
     }
 }

@@ -386,7 +386,7 @@ struct TerminalWithOverlay: View {
         if tab.kind == .sftp, let b = tab.browser() {
             // SFTP záložka: prohlížeč souborů + malý terminál pro přihlášení / stav spojení
             VStack(spacing: 0) {
-                FileBrowserPanel(b: b, embedded: true)
+                DualFileBrowser(b: b)
                 Rectangle().fill(UI.border).frame(height: 1)
                 terminal.frame(height: 96)
             }

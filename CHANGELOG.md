@@ -566,3 +566,14 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Heslo se načte až při připojení, nikam se neukládá; tlačítko „Otestovat načtení“ ukáže jen délku hesla.
   - Při importu se odkaz na správce hesel z bezpečnostních důvodů vynuluje (jinak by cizí profil po připojení
     poslal tvoje heslo na cizí server).
+
+## 0.31.0
+
+- **Úprava souborů přímo na serveru** (SFTP → pravé tlačítko na souboru → „Upravit v editoru“): soubor se stáhne
+  do pracovní kopie (`~/Library/Caches/SSHTool/edit`, práva 0700/0600) a otevře ve výchozí aplikaci (jinak TextEdit).
+  Každé uložení v editoru se automaticky nahraje zpět na server (u PROD jednou potvrdit). Sekce „Upravované soubory“
+  ukazuje stav („✓ Uloženo na server 10:22:05“), „Ukončit“ smaže pracovní kopii; zapomenuté kopie se mažou po dni.
+  Limit 20 MB.
+- **Dvoupanelový prohlížeč** v SFTP záložce (přepínač „Dva panely“): vlevo soubory Macu, vpravo server.
+  „Nahrát →“, „← Stáhnout do levého panelu“ (bez dialogu), přetažení z levého panelu do pravého = nahrání,
+  dvojklik, skryté soubory, cesta s ~.

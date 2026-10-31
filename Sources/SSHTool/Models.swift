@@ -272,6 +272,7 @@ final class AppStore: ObservableObject {
         let snapshot = settings
         DispatchQueue.global(qos: .utility).async { LogRetention.prune(snapshot) }   // retence logů
         purgeOldTrash()                                                               // koš: starší 30 dní pryč
+        DispatchQueue.global(qos: .utility).async { SFTPBrowser.cleanupEditCopies() }  // staré pracovní kopie úprav
         save(trash, to: "trash.json")                                                 // didSet se v init nevolá
         GroupPalette.overrides = settings.groupColors
         snippets = load("snippets.json") ?? Snippet.defaults
