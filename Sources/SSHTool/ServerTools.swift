@@ -117,7 +117,7 @@ struct BulkEditSheet: View {
                         Toggle(isOn: binding(s.id)) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(s.name)
-                                Text("\(s.group) · \(s.host)\(s.isRDP ? " · RDP" : s.isTelnet ? " · Telnet" : "")")
+                                Text("\(s.group) · \(s.host)\(s.isRDP ? " · RDP" : s.isTelnet ? " · Telnet" : s.isFTP ? " · FTP" : "")")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }

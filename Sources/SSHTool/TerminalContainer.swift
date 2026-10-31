@@ -3,7 +3,7 @@ import SwiftTerm
 
 /// Typ záložky.
 enum TabKind: String, Codable {
-    case ssh, sftp, local, serial, telnet
+    case ssh, sftp, local, serial, telnet, ftp
 }
 
 /// Terminál jednoho SSH spojení (jedna záložka).
@@ -135,6 +135,10 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             process.startProcess(executable: shell, args: ["-l"], environment: envList,
                                  execName: (shell as NSString).lastPathComponent,
                                  currentDirectory: NSHomeDirectory())
+        case .ftp:
+            // FTP/FTPS záložka nemá vlastní proces – soubory obsluhuje prohlížeč (curl na každou operaci)
+            isRunning = false
+            feed(text: "\u{1B}[2m[FTP \(session.host):\(session.port) – soubory se zobrazí nahoře.]\u{1B}[0m\r\n")
         case .telnet:
             guard let exe = Bundle.main.executablePath else { isRunning = false; return }
             env["SSHTOOL_TELNET_HOST"] = session.host

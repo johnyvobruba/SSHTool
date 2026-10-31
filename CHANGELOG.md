@@ -577,3 +577,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **Dvoupanelový prohlížeč** v SFTP záložce (přepínač „Dva panely“): vlevo soubory Macu, vpravo server.
   „Nahrát →“, „← Stáhnout do levého panelu“ (bez dialogu), přetažení z levého panelu do pravého = nahrání,
   dvojklik, skryté soubory, cesta s ~.
+
+## 0.31.1
+
+- **SCP pro zařízení bez SFTP**: editor serveru → Pokročilé SSH → *Přenos souborů: SCP*. Prohlížeč souborů pak používá `scp -O` a příkazy `ls`/`mkdir`/`mv`/`rm` přes stejné SSH spojení (ControlMaster, bez dalšího přihlášení). Funguje dvoupanelový režim, úpravy souborů v editoru i průběh přenosu.
+- **FTP / FTPS**: nový protokol v editoru serveru. Výchozí je FTPS s AUTH TLS (explicitní), volitelně implicitní FTPS (port 990) nebo nešifrované FTP s varováním. Záložka FTP otevře přímo dvoupanelový prohlížeč souborů.
+  - Heslo z Klíčenky (s Touch ID), ze správce hesel (1Password / Bitwarden / KeePassXC), nebo dotaz při otevření; prázdný uživatel = anonymní přístup.
+  - Přenosy přes `curl` z macOS; heslo jde přes stdin, ne v argumentech procesu.
+  - „Nekontrolovat certifikát“ jen výslovně, s varováním; při importu cizího profilu se vypne.
+  - Složky se přes FTP přenášejí jen po jednotlivých souborech.

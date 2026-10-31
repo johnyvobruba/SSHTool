@@ -215,7 +215,7 @@ struct SidebarSessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: session.isRDP ? "display" : session.isTelnet ? "network" : "desktopcomputer")
+            Image(systemName: session.isRDP ? "display" : session.isTelnet ? "network" : session.isFTP ? "externaldrive.connected.to.line.below" : "desktopcomputer")
                 .font(.system(size: 11))
                 .foregroundStyle(UI.sessionColor(session.resolvedColorHex))
             if comfortable {
@@ -265,7 +265,7 @@ struct TabCard: View {
     private var tooltip: String {
         let mins = Int(Date().timeIntervalSince(tab.startedAt)) / 60
         let secs = Int(Date().timeIntervalSince(tab.startedAt)) % 60
-        let kind = tab.kind == .sftp ? "SFTP" : tab.kind == .local ? "Lokální" : tab.kind == .serial ? "Sériová" : tab.kind == .telnet ? "Telnet" : "SSH"
+        let kind = tab.kind == .sftp ? "SFTP" : tab.kind == .local ? "Lokální" : tab.kind == .serial ? "Sériová" : tab.kind == .telnet ? "Telnet" : tab.kind == .ftp ? "FTP" : "SSH"
         return "\(title)\n\(tab.session.name) · \(tab.subtitle)\n\(kind) • \(tab.state.label)\n"
             + (tab.running ? "Připojeno \(mins) min \(secs) s" : "Relace skončila")
     }
@@ -330,6 +330,7 @@ struct DisconnectBanner: View {
         case .local: return "Terminál ukončen"
         case .serial: return "Sériová konzole odpojena"
         case .telnet: return "Telnet spojení ukončeno"
+        case .ftp: return "FTP"
         }
     }
 
@@ -383,7 +384,9 @@ struct TerminalWithOverlay: View {
     let focus: Bool
 
     var body: some View {
-        if tab.kind == .sftp, let b = tab.browser() {
+        if tab.kind == .ftp, let b = tab.browser() {
+            DualFileBrowser(b: b)                     // FTP: bez terminálu (žádný proces)
+        } else if tab.kind == .sftp, let b = tab.browser() {
             // SFTP záložka: prohlížeč souborů + malý terminál pro přihlášení / stav spojení
             VStack(spacing: 0) {
                 DualFileBrowser(b: b)
@@ -420,6 +423,7 @@ struct StatusBar: View {
         case .local: return "Lokální / \(tab.subtitle)"
         case .serial: return "Sériová / \(tab.session.host)"
         case .telnet: return "Telnet · \(tab.session.group) / \(tabs.displayTitle(tab))"
+        case .ftp: return "\(tab.session.ftpTLS.isEmpty ? "FTP" : "FTPS") · \(tab.session.group) / \(tabs.displayTitle(tab))"
         }
     }
 
@@ -450,7 +454,7 @@ struct StatusBar: View {
                 sep
                 Text(context).lineLimit(1)
                 EnvBadge(tag: tab.session.envTag)
-                if tab.kind == .ssh || tab.kind == .sftp {
+                if tab.kind == .ssh || tab.kind == .sftp || tab.kind == .ftp {
                     sep
                     Text(tab.session.host).font(.system(size: 11, design: .monospaced))
                 }

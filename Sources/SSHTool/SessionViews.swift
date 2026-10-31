@@ -308,7 +308,7 @@ struct ServerContextMenu: View {
     }
 
     var body: some View {
-        if session.isRDP { rdpMenu } else if session.isTelnet { telnetMenu } else { sshMenu }
+        if session.isRDP { rdpMenu } else if session.isTelnet || session.isFTP { telnetMenu } else { sshMenu }
     }
 
     @ViewBuilder private var rdpMenu: some View {
@@ -344,7 +344,7 @@ struct ServerContextMenu: View {
             Button("Přejít na otevřenou relaci") { tabs.selectedID = live.id }
             Button("Připojit znovu v nové záložce") { tabs.open(session) }
         } else {
-            Button("Připojit (Telnet)") { tabs.open(session) }
+            Button(session.isFTP ? "Otevřít soubory (FTP)" : "Připojit (Telnet)") { tabs.open(session) }
         }
         Button("Připojit v rozděleném panelu") { tabs.openInSplit(session) }
         Divider()
@@ -474,7 +474,7 @@ struct SessionEditor: View {
             p.append("Host obsahuje nepovolené znaky (mezera, /, …).")
         }
         if !(1...65535).contains(s.port) { p.append("Port musí být 1–65535.") }
-        if s.user.contains(" ") || (!s.isRDP && s.user.contains("@")) { p.append("Uživatel nesmí obsahovat mezeru ani „@“.") }
+        if s.user.contains(" ") || (!s.isRDP && !s.isFTP && s.user.contains("@")) { p.append("Uživatel nesmí obsahovat mezeru ani „@“.") }
         if s.jumpHost.contains(" ") { p.append("Jump host nesmí obsahovat mezeru (formát user@bastion:port).") }
         if s.group.trimmingCharacters(in: .whitespaces).isEmpty { p.append("Vyber nebo zadej složku.") }
         if !name.isEmpty, existing.contains(where: {
@@ -535,6 +535,7 @@ struct SessionEditor: View {
                     Text("SSH").tag("ssh")
                     Text("RDP (Windows)").tag("rdp")
                     Text("Telnet").tag("telnet")
+                    Text("FTP").tag("ftp")
                 }
                 .pickerStyle(.segmented)
                 TextField("Název serveru", text: $m.session.name, prompt: Text("např. fw1-praha"))
@@ -569,6 +570,22 @@ struct SessionEditor: View {
                 TextField("Uživatel", text: $m.session.user, prompt: Text("admin"))
                 if m.session.isRDP {
                     TextField("Doména", text: $m.session.rdpDomain, prompt: Text("CORP (volitelné)"))
+                } else if m.session.isFTP {
+                    Picker("Šifrování", selection: ftpTLSBinding) {
+                        Text("FTPS – explicitní (AUTH TLS)").tag("explicit")
+                        Text("FTPS – implicitní (port 990)").tag("implicit")
+                        Text("Bez šifrování (FTP)").tag("")
+                    }
+                    if m.session.ftpTLS.isEmpty {
+                        Label("Nešifrované FTP – jméno, heslo i obsah souborů jdou sítí čitelně. Jen pro zařízení, která FTPS ani SFTP neumí.",
+                              systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
+                    } else {
+                        Toggle("Nekontrolovat certifikát serveru (self-signed)", isOn: $m.session.ftpInsecure)
+                        if m.session.ftpInsecure {
+                            Text("Šifrované, ale bez ověření identity serveru – útočník v síti se může vydávat za server a získat heslo. Lepší je přidat certifikát/CA do Klíčenky.")
+                                .font(.caption).foregroundStyle(Color.orange)
+                        }
+                    }
                 } else if m.session.isTelnet {
                     Label("Telnet není šifrovaný – přihlašovací jméno, heslo i celý výstup jdou sítí čitelně. Používej jen tam, kde zařízení SSH neumí, ideálně ve správcovské síti.",
                           systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
@@ -583,7 +600,7 @@ struct SessionEditor: View {
                 Text("Např. umístění, kontakt, číslo smlouvy, specifika přihlášení. Nepiš sem hesla – poznámky jsou v sessions.json a v exportu.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if m.session.isRDP { rdpSections } else if m.session.isTelnet { EmptyView() } else {
+            if m.session.isRDP { rdpSections } else if m.session.isTelnet { EmptyView() } else if m.session.isFTP { ftpSections } else {
             Section("Autentizace") {
                 Picker("Způsob přihlášení", selection: $m.session.auth) {
                     Text("SSH agent / ~/.ssh/config").tag(AuthMethod.agent)
@@ -632,6 +649,14 @@ struct SessionEditor: View {
                              ? "Přidá k výchozím: ssh-rsa (SHA-1), diffie-hellman-group14/1-sha1, CBC šifry, hmac-sha1 – jen ty, které klient ssh ještě zná. Slabší šifrování, používej jen pro staré Cisco IOS/ASA, F5, Gaia apod. Algoritmus, který OpenSSH úplně odstranil (DSA), vrátí jen jiný klient ssh (Nastavení → Obecné → Klient SSH)."
                              : "Pro zařízení, která po aktualizaci macOS hlásí „no matching key exchange / host key type / cipher“.")
                             .font(.caption).foregroundStyle(m.session.legacyAlgorithms ? Color.orange : .secondary)
+                        Picker("Přenos souborů", selection: $m.session.fileTransfer) {
+                            Text("SFTP (výchozí)").tag("")
+                            Text("SCP – zařízení bez SFTP").tag("scp")
+                        }
+                        if m.session.fileTransfer == "scp" {
+                            Text("Prohlížeč souborů použije scp -O a příkazy ls/mkdir/mv/rm přes stejné SSH spojení. Server musí mít běžný shell.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         Picker("Kontrola klíče serveru", selection: $m.session.hostKeyPolicy) {
                             Text("Výchozí (~/.ssh/config)").tag("")
                             Text("Zeptat se u nového klíče (ask)").tag("ask")
@@ -696,10 +721,27 @@ struct SessionEditor: View {
 
     private var protoBinding: Binding<String> {
         Binding(get: { m.session.proto }, set: { new in
-            let defaults = ["ssh": 22, "rdp": 3389, "telnet": 23]
-            if defaults.values.contains(m.session.port), let p = defaults[new] { m.session.port = p }
+            let defaults = ["ssh": 22, "rdp": 3389, "telnet": 23, "ftp": m.session.ftpTLS == "implicit" ? 990 : 21]
+            if defaults.values.contains(m.session.port) || [21, 990].contains(m.session.port), let p = defaults[new] { m.session.port = p }
             m.session.proto = new
         })
+    }
+
+    private var ftpTLSBinding: Binding<String> {
+        Binding(get: { m.session.ftpTLS }, set: { new in
+            if new == "implicit", m.session.port == 21 { m.session.port = 990 }
+            if new != "implicit", m.session.port == 990 { m.session.port = 21 }
+            m.session.ftpTLS = new
+            if new.isEmpty { m.session.ftpInsecure = false }
+        })
+    }
+
+    @ViewBuilder private var ftpSections: some View {
+        Section("Přihlášení") {
+            PasswordSourceFields(m: m)
+            Text("Prázdný uživatel = anonymní přístup. Bez uloženého hesla se SSHTool zeptá při otevření. Heslo dostane curl přes stdin (není vidět v seznamu procesů). Složky se přes FTP přenášejí jen po souborech.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func addSharedFolders() {

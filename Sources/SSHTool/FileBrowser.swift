@@ -65,22 +65,57 @@ final class SFTPBrowser: ObservableObject {
     @Published var dropTargeted = false
     @Published private(set) var waiting = false
 
+    /// Způsob přenosu: SFTP (výchozí), SCP (zařízení bez SFTP subsystému), FTP/FTPS (curl).
+    enum Backend: Sendable { case sftp, scp, ftp(FTPConfig) }
+
+    /// FTP: odkud vzít heslo (Klíčenka s Touch ID, správce hesel, nebo dotaz při připojení).
+    struct FTPCredential: Sendable {
+        let sessionID: String
+        let name: String
+        let stored: Bool
+        let needAuth: Bool
+        let ref: String
+    }
+
     let controlPath: String
     let destination: String
     let sessionName: String
     let production: Bool
+    let backend: Backend
+    private let ftpCredential: FTPCredential?
+    private var ftpPassword: String?
     private var home = ""
 
-    init(controlPath: String, destination: String, sessionName: String, production: Bool) {
+    var protoLabel: String {
+        switch backend {
+        case .sftp: return "SFTP"
+        case .scp: return "SCP"
+        case .ftp(let c): return c.tls.isEmpty ? "FTP" : "FTPS"
+        }
+    }
+
+    init(controlPath: String, destination: String, sessionName: String, production: Bool,
+         backend: Backend = .sftp, ftpCredential: FTPCredential? = nil) {
         self.controlPath = controlPath
         self.destination = destination
         self.sessionName = sessionName
         self.production = production
+        self.backend = backend
+        self.ftpCredential = ftpCredential
         Task { await self.waitForLogin() }
     }
 
     /// Počká, až je hlavní SSH spojení přihlášené (socket ControlMaster odpovídá), pak otevře domovskou složku.
+    /// FTP: nejdřív získá heslo (mimo hlavní vlákno – Touch ID / správce hesel / dialog).
     private func waitForLogin() async {
+        if case .ftp(let cfg) = backend {
+            let cred = ftpCredential
+            let r = await Task.detached { Self.loadFTPPassword(cfg, cred) }.value
+            if let e = r.error { error = e; return }
+            ftpPassword = r.password
+            await goHome()
+            return
+        }
         let cp = controlPath, dest = destination
         for i in 0..<180 {                                        // až 3 minuty (heslo, OTP, Touch ID)
             let ready = await Task.detached { Self.masterReady(cp, dest) }.value
@@ -90,6 +125,28 @@ final class SFTPBrowser: ObservableObject {
         }
         waiting = false
         error = "Spojení se nepřihlásilo do 3 minut – zkontroluj terminál pod seznamem (⌘R = znovu připojit)."
+    }
+
+    nonisolated static func loadFTPPassword(_ cfg: FTPConfig, _ c: FTPCredential?) -> (password: String?, error: String?) {
+        if cfg.user.isEmpty { return (nil, nil) }                     // anonymní přístup
+        if let c, !c.ref.isEmpty {
+            switch ExternalSecrets.fetch(c.ref) {
+            case .success(let p): return (p, nil)
+            case .failure(let f): return (nil, "Heslo ze správce hesel nelze načíst: " + f.message)
+            }
+        }
+        if let c, c.stored {
+            // příznak Touch ID se bere i z Klíčenky (sessions.json lze přepsat bez ověření)
+            if c.needAuth || KeychainStore.requiresAuth(for: c.sessionID),
+               !UserAuth.authenticate(reason: "použít uložené heslo pro FTP „\(c.name)“") {
+                return (nil, "Ověření zrušeno – soubory se nenačetly.")
+            }
+            if let p = KeychainStore.password(for: c.sessionID) { return (p, nil) }
+        }
+        guard let p = ExternalSecrets.askSecret("FTP – \(c?.name ?? cfg.host)", "Heslo pro \(cfg.user)@\(cfg.host):") else {
+            return (nil, "Přihlášení zrušeno (bez hesla). Znovu: tlačítko Obnovit nebo ⌘R.")
+        }
+        return (p, nil)
     }
 
     nonisolated static func masterReady(_ cp: String, _ dest: String) -> Bool {
@@ -119,8 +176,13 @@ final class SFTPBrowser: ObservableObject {
     }
 
     private func run(_ commands: [String], pid: Box<Int32>? = nil) async -> (ok: Bool, out: String, err: String) {
-        let cp = controlPath, dest = destination
+        let cp = controlPath, dest = destination, be = backend, pw = ftpPassword
         return await Task.detached {
+            switch be {
+            case .scp: return FileBackend.scp(commands, cp: cp, dest: dest, pid: pid)
+            case .ftp(let c): return FileBackend.ftp(commands, c, password: pw, pid: pid)
+            case .sftp: break
+            }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/sftp")
             p.arguments = ["-b", "-", "-S", SSHBinary.path, "-o", "ControlPath=\(cp)", "-o", "ControlMaster=no",
@@ -166,8 +228,17 @@ final class SFTPBrowser: ObservableObject {
             await list(home)
         } else {
             loading = false
-            error = r.err.isEmpty ? "SFTP není dostupné" : Self.cleanErr(r.err)
-                + "\nTip: Check Point Gaia potřebuje uživatele se shellem /bin/bash a povolený SFTP."
+            switch backend {
+            case .sftp:
+                error = (r.err.isEmpty ? "SFTP není dostupné" : Self.cleanErr(r.err))
+                    + "\nTip: Check Point Gaia potřebuje uživatele se shellem /bin/bash a povolený SFTP."
+                    + " Zařízení bez SFTP: v editoru serveru → Pokročilé → Přenos souborů: SCP."
+            case .scp:
+                error = (r.err.isEmpty ? "SCP: příkazový řádek serveru nereaguje" : Self.cleanErr(r.err))
+                    + "\nSCP potřebuje na serveru běžný shell (ls, mkdir, mv, rm)."
+            case .ftp:
+                error = r.err.isEmpty ? "FTP server nereaguje" : Self.cleanErr(r.err)
+            }
         }
     }
 
@@ -222,7 +293,10 @@ final class SFTPBrowser: ObservableObject {
         Task { await list(parent.isEmpty ? "/" : parent) }
     }
 
-    func refresh() { Task { await list(path.isEmpty ? home : path) } }
+    func refresh() {
+        if home.isEmpty, path.isEmpty { error = nil; Task { await waitForLogin() }; return }   // přihlášení se nepovedlo → zkusit znovu
+        Task { await list(path.isEmpty ? home : path) }
+    }
     func goToField() {
         let p = pathField.trimmingCharacters(in: .whitespaces)
         guard !p.isEmpty else { return }
@@ -547,7 +621,7 @@ struct FileBrowserPanel: View {
             // záhlaví
             HStack(spacing: 6) {
                 Image(systemName: "folder").foregroundStyle(UI.accent)
-                Text((embedded ? "SFTP · " : "Soubory · ") + b.sessionName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text((embedded ? b.protoLabel + " · " : "Soubory · ") + b.sessionName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
                 if b.production { EnvBadge(tag: "prod") }
                 Spacer()
                 if !embedded {

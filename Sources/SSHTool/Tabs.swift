@@ -38,14 +38,22 @@ final class TerminalTab: ObservableObject, Identifiable {
     var canMonitor: Bool { kind == .ssh && running && view.controlPath != nil }
 
     /// SSH i SFTP záložka mají ControlMaster → lze procházet soubory serveru.
-    var canBrowse: Bool { (kind == .ssh || kind == .sftp) && running && view.controlPath != nil }
+    var canBrowse: Bool { kind == .ftp || ((kind == .ssh || kind == .sftp) && running && view.controlPath != nil) }
 
     /// Prohlížeč souborů (SFTP) přes spojení této záložky – vytváří se při prvním otevření panelu.
     private(set) var filesBrowser: SFTPBrowser?
     func browser() -> SFTPBrowser? {
-        if filesBrowser == nil, canBrowse, let cp = view.controlPath {
+        if filesBrowser == nil, kind == .ftp {
+            let s = session
+            let cfg = FTPConfig(host: s.host, port: s.port, user: s.user, tls: s.ftpTLS, insecure: s.ftpInsecure)
+            let cred = SFTPBrowser.FTPCredential(sessionID: s.id.uuidString, name: s.name, stored: s.hasStoredPassword,
+                                                 needAuth: s.requireUserAuth, ref: s.passwordRef)
+            filesBrowser = SFTPBrowser(controlPath: "", destination: s.host, sessionName: s.name,
+                                       production: s.envTag == "prod", backend: .ftp(cfg), ftpCredential: cred)
+        } else if filesBrowser == nil, canBrowse, let cp = view.controlPath {
             filesBrowser = SFTPBrowser(controlPath: cp, destination: session.destinationString,
-                                       sessionName: session.name, production: session.envTag == "prod")
+                                       sessionName: session.name, production: session.envTag == "prod",
+                                       backend: session.fileTransfer == "scp" ? .scp : .sftp)
         }
         return filesBrowser
     }
@@ -72,6 +80,7 @@ final class TerminalTab: ObservableObject, Identifiable {
             return (sh as NSString).lastPathComponent
         case .serial: return "\(session.host) · \(serial?.baud ?? 0) baud"
         case .telnet: return "telnet · " + session.host
+        case .ftp: return (session.ftpTLS.isEmpty ? "ftp · " : "ftps · ") + session.host
         }
     }
 
@@ -80,6 +89,7 @@ final class TerminalTab: ObservableObject, Identifiable {
         case .ssh: return session.name
         case .sftp: return "SFTP · " + session.name
         case .local, .serial, .telnet: return session.name
+        case .ftp: return (session.ftpTLS.isEmpty ? "FTP · " : "FTPS · ") + session.name
         }
     }
 
@@ -90,6 +100,7 @@ final class TerminalTab: ObservableObject, Identifiable {
         case .local: return "terminal"
         case .serial: return "cable.connector"
         case .telnet: return "network"
+        case .ftp: return "externaldrive.connected.to.line.below"
         }
     }
 
@@ -116,6 +127,7 @@ final class TerminalTab: ObservableObject, Identifiable {
             if Prefs.current.monitorAuto { self?.startMonitor() }   // čeká, až bude relace přihlášená
         }
         view.start(kind: kind, session: session, serial: serial)
+        if kind == .ftp { hasOutput = true }
         if Prefs.current.logEnabled { logging = view.startLogging() }
         if (kind == .ssh || kind == .sftp), session.jumpHost.isEmpty, Prefs.current.latencyEnabled {
             latency = LatencyProbe(host: session.host)
@@ -392,7 +404,7 @@ final class TabManager: ObservableObject {
 
     func open(_ s: SSHSession, kind: TabKind = .ssh) {
         if s.isRDP { RDPLauncher.shared.launch(s); return }      // RDP = samostatné okno FreeRDP
-        insert(TerminalTab(session: s, kind: s.isTelnet ? .telnet : kind))
+        insert(TerminalTab(session: s, kind: s.isTelnet ? .telnet : s.isFTP ? .ftp : kind))
     }
 
     private func insert(_ t: TerminalTab) {
@@ -457,7 +469,7 @@ final class TabManager: ObservableObject {
 
     /// Běžící SSH záložka serveru (pro „Připojit“ = přejít na otevřenou relaci).
     func liveTab(for sessionID: UUID) -> TerminalTab? {
-        tabs.first { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .telnet) && $0.running }
+        tabs.first { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .telnet || $0.kind == .ftp) && $0.running }
     }
 
     /// Dvojklik / „Připojit“: otevřená relace → přepnout na ni, jinak nová záložka.

@@ -52,6 +52,12 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var hostKeyPolicy = ""
     /// Protokol: "ssh" (výchozí) nebo "rdp" (FreeRDP v samostatném okně).
     var proto = "ssh"
+    /// Prohlížeč souborů u SSH: "" = SFTP, "scp" = SCP (zařízení bez SFTP subsystému).
+    var fileTransfer = ""
+    /// FTP: "" bez šifrování, "explicit" (FTPS, AUTH TLS), "implicit" (FTPS, port 990).
+    var ftpTLS = "explicit"
+    /// FTPS: nekontrolovat certifikát serveru (self-signed) – jen výslovně.
+    var ftpInsecure = false
     var rdpDomain = ""
     var rdpGateway = ""                 // RD Gateway (user@gw nebo gw)
     var rdpSize = "dynamic"             // dynamic | fullscreen | 1920x1080 …
@@ -77,6 +83,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
 
     var isRDP: Bool { proto == "rdp" }
     var isTelnet: Bool { proto == "telnet" }
+    var isFTP: Bool { proto == "ftp" }
 
     /// X11 forwarding jen pro SSH záložku: -X (nedůvěryhodné, doporučené) / -Y (důvěryhodné).
     var x11Args: [String] { x11 == "trusted" ? ["-Y"] : x11 == "untrusted" ? ["-X"] : [] }
@@ -94,7 +101,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, legacyAlgorithms, x11, notes, hasStoredPassword, passwordRef, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
-             proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpMonitor, rdpAutoMonitor, rdpCertPolicy, rdpExtraArgs,
+             proto, fileTransfer, ftpTLS, ftpInsecure, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpMonitor, rdpAutoMonitor, rdpCertPolicy, rdpExtraArgs,
              rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
 
@@ -400,6 +407,7 @@ final class AppStore: ObservableObject {
         if s.x11 == "trusted" { removed.append("důvěryhodné X11 → nedůvěryhodné"); s.x11 = "untrusted" }
         // odkaz na správce hesel z cizího profilu by po připojení poslal tvoje heslo na cizí server
         if !s.passwordRef.isEmpty { removed.append("odkaz na správce hesel"); s.passwordRef = "" }
+        if s.ftpInsecure { removed.append("FTPS bez kontroly certifikátu"); s.ftpInsecure = false }
         if s.rdpShareHome { removed.append("sdílení domovské složky"); s.rdpShareHome = false }
         if !s.rdpFolders.isEmpty { removed.append("sdílené složky (\(s.rdpFolders.count))"); s.rdpFolders = [] }
         if !s.rdpExtraArgs.isEmpty { removed.append("další argumenty FreeRDP („\(s.rdpExtraArgs)“)"); s.rdpExtraArgs = "" }
@@ -741,7 +749,11 @@ extension SSHSession {
         connectTimeout = try c.decodeIfPresent(Int.self, forKey: .connectTimeout) ?? 0
         hostKeyPolicy = try c.decodeIfPresent(String.self, forKey: .hostKeyPolicy) ?? ""
         let pr = try c.decodeIfPresent(String.self, forKey: .proto) ?? "ssh"
-        proto = ["rdp", "telnet"].contains(pr) ? pr : "ssh"
+        proto = ["rdp", "telnet", "ftp"].contains(pr) ? pr : "ssh"
+        fileTransfer = (try c.decodeIfPresent(String.self, forKey: .fileTransfer)) == "scp" ? "scp" : ""
+        let tls = try c.decodeIfPresent(String.self, forKey: .ftpTLS) ?? "explicit"
+        ftpTLS = ["", "explicit", "implicit"].contains(tls) ? tls : "explicit"
+        ftpInsecure = try c.decodeIfPresent(Bool.self, forKey: .ftpInsecure) ?? false
         rdpDomain = try c.decodeIfPresent(String.self, forKey: .rdpDomain) ?? ""
         rdpGateway = try c.decodeIfPresent(String.self, forKey: .rdpGateway) ?? ""
         rdpSize = try c.decodeIfPresent(String.self, forKey: .rdpSize) ?? "dynamic"
