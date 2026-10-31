@@ -385,6 +385,17 @@ struct SettingsGeneralPane: View {
                 SKToggle(isOn: $store.settings.latencyEnabled)
                     .help("ICMP ping k serveru – nevytváří SSH spojení ani záznamy v logu sshd. Pokud ICMP blokuje firewall, ukáže se „ICMP –“.")
             }
+            SKRow("Klient SSH", help: (SSHBinary.version(SSHBinary.path).map { "\(SSHBinary.path) · \($0)" } ?? SSHBinary.path)
+                  + ". Vlastní klient (např. Homebrew OpenSSH) jen pokud systémový nezná potřebný algoritmus.") {
+                HStack(spacing: 6) {
+                    TextField("/usr/bin/ssh (systémový)", text: $store.settings.sshPath).skField(width: 200, mono: true)
+                    Button("Vybrat…") {
+                        let p = NSOpenPanel(); p.title = "Klient ssh (soubor musí se jmenovat ssh)"
+                        p.directoryURL = URL(fileURLWithPath: "/opt/homebrew/bin")
+                        if p.runModal() == .OK, let u = p.url { store.settings.sshPath = u.path }
+                    }.buttonStyle(SKButton())
+                }
+            }
             SKRow("FreeRDP (RDP relace)", help: FreeRDP.binary.map { "Nalezeno: \($0)" } ?? "Nenalezeno – brew install freerdp") {
                 HStack(spacing: 6) {
                     TextField("automaticky", text: $store.settings.freerdpPath).skField(width: 200, mono: true)
@@ -914,6 +925,7 @@ struct SettingsServersPane: View {
         ("rdpDebugLog", "ne", "RDP: true/false – podrobný log FreeRDP (diagnostika)"),
         ("rdpFolders", "ne", "RDP: pole cest ke sdíleným složkám, např. [\"/Users/jan/RDP\"]"),
         ("rdpMonitor", "ne", "RDP: název monitoru pro celou obrazovku (\"\" = kde je okno SSHTool)"),
+        ("legacyAlgorithms", "ne", "true/false – starší zařízení: povolit ssh-rsa, SHA-1 KEX, CBC (jen tento server)"),
         ("forwards", "ne", "Tunely: [{\"kind\":\"L\",\"listenPort\":8443,\"destHost\":\"10.0.0.5\",\"destPort\":443}] – L/R/D; po importu vypnuté"),
         ("rdpAutoMonitor", "ne", "RDP: true/false – po přesunu celé obrazovky na jiný monitor automaticky přepojit"),
         ("rdpScale", "ne", "RDP: měřítko ve Windows v % (0 = automaticky, 100–200)"),

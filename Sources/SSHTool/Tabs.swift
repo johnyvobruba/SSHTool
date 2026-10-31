@@ -71,6 +71,7 @@ final class TerminalTab: ObservableObject, Identifiable {
             let sh = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
             return (sh as NSString).lastPathComponent
         case .serial: return "\(session.host) · \(serial?.baud ?? 0) baud"
+        case .telnet: return "telnet · " + session.host
         }
     }
 
@@ -78,7 +79,7 @@ final class TerminalTab: ObservableObject, Identifiable {
         switch kind {
         case .ssh: return session.name
         case .sftp: return "SFTP · " + session.name
-        case .local, .serial: return session.name
+        case .local, .serial, .telnet: return session.name
         }
     }
 
@@ -88,6 +89,7 @@ final class TerminalTab: ObservableObject, Identifiable {
         case .sftp: return "folder"
         case .local: return "terminal"
         case .serial: return "cable.connector"
+        case .telnet: return "network"
         }
     }
 
@@ -148,6 +150,8 @@ final class TabManager: ObservableObject {
     @Published var showQuickConnect = false     // ⇧⌘K – připojení zadáním user@host:port
     @Published var showCapture = false          // ⌥⌘P – průvodce tcpdump / fw monitor
     @Published var tunnelsTab: TerminalTab?     // okno Tunely pro běžící SSH relaci
+    @Published var showTrash = false            // koš smazaných serverů
+    @Published var bulkEditGroup: String?       // hromadná úprava: složka ("" = všechny servery)
     let capture = CaptureModel()                // parametry zůstávají mezi otevřeními
     @Published var showMultiSend = false        // ⌥⌘I – odeslat příkazy do vybraných relací
     let multiSend = MultiSendModel()            // text a výběr zůstávají mezi otevřeními
@@ -388,7 +392,7 @@ final class TabManager: ObservableObject {
 
     func open(_ s: SSHSession, kind: TabKind = .ssh) {
         if s.isRDP { RDPLauncher.shared.launch(s); return }      // RDP = samostatné okno FreeRDP
-        insert(TerminalTab(session: s, kind: kind))
+        insert(TerminalTab(session: s, kind: s.isTelnet ? .telnet : kind))
     }
 
     private func insert(_ t: TerminalTab) {
@@ -453,7 +457,7 @@ final class TabManager: ObservableObject {
 
     /// Běžící SSH záložka serveru (pro „Připojit“ = přejít na otevřenou relaci).
     func liveTab(for sessionID: UUID) -> TerminalTab? {
-        tabs.first { $0.session.id == sessionID && $0.kind == .ssh && $0.running }
+        tabs.first { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .telnet) && $0.running }
     }
 
     /// Dvojklik / „Připojit“: otevřená relace → přepnout na ni, jinak nová záložka.
@@ -607,6 +611,12 @@ struct MainView: View {
         .background(WindowConfigurator(title: tabs.selected?.title ?? "SSHTool"))
         .sheet(isPresented: $tabs.showPicker) {
             QuickConnectView().environmentObject(store).environmentObject(tabs)
+        }
+        .sheet(isPresented: $tabs.showTrash) {
+            TrashSheet().environmentObject(store)
+        }
+        .sheet(isPresented: Binding(get: { tabs.bulkEditGroup != nil }, set: { if !$0 { tabs.bulkEditGroup = nil } })) {
+            BulkEditSheet(group: tabs.bulkEditGroup ?? "").environmentObject(store)
         }
         .sheet(item: $tabs.tunnelsTab) { t in
             TunnelsSheet(tab: t).environmentObject(store)

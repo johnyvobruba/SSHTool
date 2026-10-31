@@ -67,7 +67,7 @@ final class LiveCapture: ObservableObject, @unchecked Sendable {
         w.terminationHandler = { [weak self] _ in self?.stop() }      // Wireshark zavřen → ukončit odchyt
 
         let s = Process()
-        s.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        s.executableURL = URL(fileURLWithPath: SSHBinary.path)
         s.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", "--", destination, remote]
         var env = ProcessInfo.sanitizedEnvironment
         env.removeValue(forKey: "SSH_ASKPASS")
@@ -166,7 +166,7 @@ extension TabManager {
             FileManager.default.createFile(atPath: local.path, contents: nil, attributes: [.posixPermissions: 0o600])
             guard let fh = try? FileHandle(forWritingTo: local) else { return }
             let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+            p.executableURL = URL(fileURLWithPath: SSHBinary.path)
             p.arguments = ["-S", cp, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", "--", dest, "\(sudo)cat \(remotePath)"]
             p.standardInput = FileHandle.nullDevice
             p.standardOutput = fh

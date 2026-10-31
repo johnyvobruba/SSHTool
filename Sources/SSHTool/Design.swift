@@ -215,7 +215,7 @@ struct SidebarSessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: session.isRDP ? "display" : "desktopcomputer")
+            Image(systemName: session.isRDP ? "display" : session.isTelnet ? "network" : "desktopcomputer")
                 .font(.system(size: 11))
                 .foregroundStyle(UI.sessionColor(session.resolvedColorHex))
             if comfortable {
@@ -247,7 +247,8 @@ struct SidebarSessionRow: View {
             RoundedRectangle(cornerRadius: 2).fill(UI.accent).frame(width: 3).padding(.vertical, 4)
                 .opacity(active ? 1 : 0)
         }
-        .help("\(session.name)\n\(session.user.isEmpty ? "" : session.user + "@")\(session.host):\(session.port) · \(session.group)\n\(state?.label ?? "Bez otevřené relace")")
+        .help("\(session.name)\n\(session.user.isEmpty ? "" : session.user + "@")\(session.host):\(session.port) · \(session.group)\n\(state?.label ?? "Bez otevřené relace")"
+              + (session.notes.isEmpty ? "" : "\n\n📝 " + session.notes))
     }
 }
 
@@ -264,7 +265,7 @@ struct TabCard: View {
     private var tooltip: String {
         let mins = Int(Date().timeIntervalSince(tab.startedAt)) / 60
         let secs = Int(Date().timeIntervalSince(tab.startedAt)) % 60
-        let kind = tab.kind == .sftp ? "SFTP" : tab.kind == .local ? "Lokální" : tab.kind == .serial ? "Sériová" : "SSH"
+        let kind = tab.kind == .sftp ? "SFTP" : tab.kind == .local ? "Lokální" : tab.kind == .serial ? "Sériová" : tab.kind == .telnet ? "Telnet" : "SSH"
         return "\(title)\n\(tab.session.name) · \(tab.subtitle)\n\(kind) • \(tab.state.label)\n"
             + (tab.running ? "Připojeno \(mins) min \(secs) s" : "Relace skončila")
     }
@@ -328,6 +329,7 @@ struct DisconnectBanner: View {
         case .sftp: return "SFTP spojení ukončeno"
         case .local: return "Terminál ukončen"
         case .serial: return "Sériová konzole odpojena"
+        case .telnet: return "Telnet spojení ukončeno"
         }
     }
 
@@ -417,6 +419,7 @@ struct StatusBar: View {
         case .sftp: return "SFTP · \(tab.session.group) / \(tab.session.displayName)"
         case .local: return "Lokální / \(tab.subtitle)"
         case .serial: return "Sériová / \(tab.session.host)"
+        case .telnet: return "Telnet · \(tab.session.group) / \(tabs.displayTitle(tab))"
         }
     }
 

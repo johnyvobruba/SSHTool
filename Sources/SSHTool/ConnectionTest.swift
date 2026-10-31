@@ -163,7 +163,7 @@ final class ConnectionTester: ObservableObject {
 
     nonisolated static func sshProbe(_ args: [String]) -> (code: Int32, err: String) {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        p.executableURL = URL(fileURLWithPath: SSHBinary.path)
         // první -o vyhrává: striktní kontrola klíče (žádný zápis do known_hosts), žádná interakce
         p.arguments = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=8",
                        "-o", "NumberOfPasswordPrompts=0", "-T"] + args + ["exit"]

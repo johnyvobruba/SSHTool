@@ -3,7 +3,7 @@ import SwiftTerm
 
 /// Typ záložky.
 enum TabKind: String, Codable {
-    case ssh, sftp, local, serial
+    case ssh, sftp, local, serial, telnet
 }
 
 /// Terminál jednoho SSH spojení (jedna záložka).
@@ -119,7 +119,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
         case .ssh:
             let cp = RemoteMonitor.controlPath(for: UUID())
             controlPath = cp
-            process.startProcess(executable: "/usr/bin/ssh", args: session.forwardArgs + session.sshArguments(controlPath: cp),
+            process.startProcess(executable: SSHBinary.path, args: session.x11Args + session.forwardArgs + session.sshArguments(controlPath: cp),
                                  environment: envList, execName: "ssh")
         case .sftp:
             // SFTP záložka = grafický prohlížeč souborů. ssh tu jen drží přihlášené spojení (ControlMaster, -N);
@@ -127,13 +127,21 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             let cp = RemoteMonitor.controlPath(for: UUID())
             controlPath = cp
             feed(text: "\u{1B}[2m[Přihlašování pro prohlížeč souborů – případné heslo / OTP zadej sem. Soubory se zobrazí nahoře.]\u{1B}[0m\r\n")
-            process.startProcess(executable: "/usr/bin/ssh", args: ["-N"] + session.sshArguments(controlPath: cp),
+            process.startProcess(executable: SSHBinary.path, args: ["-N"] + session.sshArguments(controlPath: cp),
                                  environment: envList, execName: "ssh")
         case .local:
             let shell = env["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
             process.startProcess(executable: shell, args: ["-l"], environment: envList,
                                  execName: (shell as NSString).lastPathComponent,
                                  currentDirectory: NSHomeDirectory())
+        case .telnet:
+            guard let exe = Bundle.main.executablePath else { isRunning = false; return }
+            env["SSHTOOL_TELNET_HOST"] = session.host
+            env["SSHTOOL_TELNET_PORT"] = String(session.port)
+            env.removeValue(forKey: "SSHTOOL_SESSION_ID")
+            process.startProcess(executable: exe, args: [],
+                                 environment: env.map { "\($0.key)=\($0.value)" },
+                                 execName: "sshtool-telnet")
         case .serial:
             // most PTY ↔ /dev/cu.* = naše vlastní binárka v sériovém režimu (viz SerialBridge)
             guard let serial, let exe = Bundle.main.executablePath else {

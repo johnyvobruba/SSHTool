@@ -60,6 +60,9 @@ struct SSHToolApp: App {
                 Button("Importovat session…") { store.importSessionsPanel() }
                 Button("Exportovat servery bez hesel…") { store.exportSessionsPanel() }
                 Button("Uložit vzor JSON se servery…") { store.saveSessionsTemplatePanel() }
+                Divider()
+                Button("Hromadná úprava serverů…") { tabs.bulkEditGroup = "" }
+                Button("Koš…\(store.trash.isEmpty ? "" : " (\(store.trash.count))")") { tabs.showTrash = true }
             }
             // ⌘F / ⌘G – hledání ve výstupu aktivního terminálu
             CommandGroup(replacing: .textEditing) {

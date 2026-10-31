@@ -34,6 +34,7 @@ struct AppSettings: Codable, Equatable {
     var autoUpdateCheck = true            // kontrolovat nové verze na GitHubu při spuštění
     var folders: [String] = []            // složky (i prázdné) – cesty „A/B/C“
     var freerdpPath = ""                  // "" = automaticky (Homebrew), jinak cesta ke klientovi FreeRDP
+    var sshPath = ""                      // "" = systémový /usr/bin/ssh, jinak vlastní klient (např. Homebrew OpenSSH)
 
     /// Volitelná písma terminálu – v nastavení se nabídnou jen nainstalovaná.
     static let fontChoices: [(name: String, label: String)] = [
@@ -51,7 +52,7 @@ struct AppSettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case copyOnSelect, rightClickPaste, logEnabled, logDirectory, logPlainText, scrollback, fontSize, serialBaud, collapsedGroups,
              fontName, lineSpacing, highlightEnabled, sidebarComfortable, latencyEnabled,
-             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, logRetentionDays, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders, freerdpPath
+             themeID, appearance, terminalFollowsApp, terminalThemeID, showFavorites, disabledRuleGroups, logMaxMB, logRetentionDays, optionAsMeta, groupColors, focusShowStatus, monitorAuto, autoUpdateCheck, folders, freerdpPath, sshPath
     }
 
     var logDirectoryURL: URL {
@@ -93,6 +94,7 @@ extension AppSettings {
         autoUpdateCheck = try c.decodeIfPresent(Bool.self, forKey: .autoUpdateCheck) ?? d.autoUpdateCheck
         folders = try c.decodeIfPresent([String].self, forKey: .folders) ?? d.folders
         freerdpPath = try c.decodeIfPresent(String.self, forKey: .freerdpPath) ?? d.freerdpPath
+        sshPath = try c.decodeIfPresent(String.self, forKey: .sshPath) ?? d.sshPath
     }
 }
 

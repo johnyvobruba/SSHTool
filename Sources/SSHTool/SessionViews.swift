@@ -190,6 +190,7 @@ struct SessionListView: View {
             } else {
                 Divider()
                 Button("Nový server v této složce…") { ui.editing = newSession(in: g) }
+                Button("Hromadná úprava serverů ve složce…") { tabs.bulkEditGroup = g }
                 Button("Nová podsložka…") {
                     if let n = askText("Nová podsložka", "Název podsložky v „\(g)“:") { store.createFolder(g + "/" + n) }
                 }
@@ -307,7 +308,7 @@ struct ServerContextMenu: View {
     }
 
     var body: some View {
-        if session.isRDP { rdpMenu } else { sshMenu }
+        if session.isRDP { rdpMenu } else if session.isTelnet { telnetMenu } else { sshMenu }
     }
 
     @ViewBuilder private var rdpMenu: some View {
@@ -335,6 +336,21 @@ struct ServerContextMenu: View {
         Button("Duplikovat server") { store.duplicate(session) }
         Button("Kopírovat IP adresu") { copy(session.host) }
         Button("Kopírovat příkaz FreeRDP (bez hesla)") { copy(FreeRDP.commandLine(session)) }
+        commonTail
+    }
+
+    @ViewBuilder private var telnetMenu: some View {
+        if let live = tabs.liveTab(for: session.id) {
+            Button("Přejít na otevřenou relaci") { tabs.selectedID = live.id }
+            Button("Připojit znovu v nové záložce") { tabs.open(session) }
+        } else {
+            Button("Připojit (Telnet)") { tabs.open(session) }
+        }
+        Button("Připojit v rozděleném panelu") { tabs.openInSplit(session) }
+        Divider()
+        Button("Upravit server…") { edit() }
+        Button("Duplikovat server") { store.duplicate(session) }
+        Button("Kopírovat IP adresu") { copy(session.host) }
         commonTail
     }
 
@@ -376,8 +392,8 @@ struct ServerContextMenu: View {
         Button("Smazat server…", role: .destructive) {
             let a = NSAlert()
             a.alertStyle = .warning
-            a.messageText = "Smazat server „\(session.name)“?"
-            a.informativeText = "Smaže se i uložené heslo v Klíčence. Otevřené relace zůstanou do zavření."
+            a.messageText = "Přesunout server „\(session.name)“ do koše?"
+            a.informativeText = "Z koše ho do 30 dní obnovíš (Soubor → Koš…), včetně uloženého hesla. Otevřené relace zůstanou do zavření."
             a.addButton(withTitle: "Smazat")
             a.addButton(withTitle: "Zrušit")
             if a.runModal() == .alertFirstButtonReturn { store.delete(session.id) }
@@ -518,6 +534,7 @@ struct SessionEditor: View {
                 Picker("Protokol", selection: protoBinding) {
                     Text("SSH").tag("ssh")
                     Text("RDP (Windows)").tag("rdp")
+                    Text("Telnet").tag("telnet")
                 }
                 .pickerStyle(.segmented)
                 TextField("Název serveru", text: $m.session.name, prompt: Text("např. fw1-praha"))
@@ -552,11 +569,21 @@ struct SessionEditor: View {
                 TextField("Uživatel", text: $m.session.user, prompt: Text("admin"))
                 if m.session.isRDP {
                     TextField("Doména", text: $m.session.rdpDomain, prompt: Text("CORP (volitelné)"))
+                } else if m.session.isTelnet {
+                    Label("Telnet není šifrovaný – přihlašovací jméno, heslo i celý výstup jdou sítí čitelně. Používej jen tam, kde zařízení SSH neumí, ideálně ve správcovské síti.",
+                          systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Color.orange)
                 } else {
                     TextField("Jump host", text: $m.session.jumpHost, prompt: Text("user@bastion (ProxyJump)"))
                 }
             }
-            if m.session.isRDP { rdpSections } else {
+            Section("Poznámky") {
+                TextEditor(text: $m.session.notes)
+                    .font(.system(.body))
+                    .frame(minHeight: 60)
+                Text("Např. umístění, kontakt, číslo smlouvy, specifika přihlášení. Nepiš sem hesla – poznámky jsou v sessions.json a v exportu.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if m.session.isRDP { rdpSections } else if m.session.isTelnet { EmptyView() } else {
             Section("Autentizace") {
                 Picker("Způsob přihlášení", selection: $m.session.auth) {
                     Text("SSH agent / ~/.ssh/config").tag(AuthMethod.agent)
@@ -590,6 +617,21 @@ struct SessionEditor: View {
                                 .frame(width: 70).multilineTextAlignment(.trailing)
                             Text("0 = výchozí").font(.caption).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
                         }
+                        Picker("X11 forwarding", selection: $m.session.x11) {
+                            Text("Vypnuto").tag("")
+                            Text("Nedůvěryhodné (-X) – doporučeno").tag("untrusted")
+                            Text("Důvěryhodné (-Y)").tag("trusted")
+                        }
+                        if !m.session.x11.isEmpty {
+                            Text((FileManager.default.fileExists(atPath: "/Applications/Utilities/XQuartz.app") ? "" : "Pro zobrazení oken je potřeba XQuartz (brew install --cask xquartz). ")
+                                 + (m.session.x11 == "trusted" ? "Důvěryhodné X11 dává serveru plný přístup k tvému displeji (i zachytávání kláves) – jen pro důvěryhodné servery." : "Grafické aplikace ze serveru (např. Wireshark, xterm) se otevřou na Macu."))
+                                .font(.caption).foregroundStyle(m.session.x11 == "trusted" ? Color.orange : .secondary)
+                        }
+                        Toggle("Starší zařízení – povolit legacy algoritmy", isOn: $m.session.legacyAlgorithms)
+                        Text(m.session.legacyAlgorithms
+                             ? "Přidá k výchozím: ssh-rsa (SHA-1), diffie-hellman-group14/1-sha1, CBC šifry, hmac-sha1 – jen ty, které klient ssh ještě zná. Slabší šifrování, používej jen pro staré Cisco IOS/ASA, F5, Gaia apod. Algoritmus, který OpenSSH úplně odstranil (DSA), vrátí jen jiný klient ssh (Nastavení → Obecné → Klient SSH)."
+                             : "Pro zařízení, která po aktualizaci macOS hlásí „no matching key exchange / host key type / cipher“.")
+                            .font(.caption).foregroundStyle(m.session.legacyAlgorithms ? Color.orange : .secondary)
                         Picker("Kontrola klíče serveru", selection: $m.session.hostKeyPolicy) {
                             Text("Výchozí (~/.ssh/config)").tag("")
                             Text("Zeptat se u nového klíče (ask)").tag("ask")
@@ -654,8 +696,8 @@ struct SessionEditor: View {
 
     private var protoBinding: Binding<String> {
         Binding(get: { m.session.proto }, set: { new in
-            if new == "rdp", m.session.port == 22 { m.session.port = 3389 }
-            if new == "ssh", m.session.port == 3389 { m.session.port = 22 }
+            let defaults = ["ssh": 22, "rdp": 3389, "telnet": 23]
+            if defaults.values.contains(m.session.port), let p = defaults[new] { m.session.port = p }
             m.session.proto = new
         })
     }

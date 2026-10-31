@@ -95,7 +95,7 @@ final class SFTPBrowser: ObservableObject {
     nonisolated static func masterReady(_ cp: String, _ dest: String) -> Bool {
         guard FileManager.default.fileExists(atPath: cp) else { return false }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        p.executableURL = URL(fileURLWithPath: SSHBinary.path)
         p.arguments = ["-S", cp, "-O", "check", dest]
         p.standardInput = FileHandle.nullDevice
         p.standardOutput = FileHandle.nullDevice
@@ -123,7 +123,7 @@ final class SFTPBrowser: ObservableObject {
         return await Task.detached {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/sftp")
-            p.arguments = ["-b", "-", "-o", "ControlPath=\(cp)", "-o", "ControlMaster=no",
+            p.arguments = ["-b", "-", "-S", SSHBinary.path, "-o", "ControlPath=\(cp)", "-o", "ControlMaster=no",
                            "-o", "BatchMode=yes", dest]
             var env = ProcessInfo.sanitizedEnvironment
             env.removeValue(forKey: "SSH_ASKPASS")

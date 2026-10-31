@@ -96,7 +96,7 @@ final class RemoteMonitor: ObservableObject, @unchecked Sendable {
     private func masterReady() -> Bool {
         guard FileManager.default.fileExists(atPath: controlPath) else { return false }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        p.executableURL = URL(fileURLWithPath: SSHBinary.path)
         p.arguments = ["-S", controlPath, "-O", "check", "--", destination]
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
@@ -109,7 +109,7 @@ final class RemoteMonitor: ObservableObject, @unchecked Sendable {
     private func launch() {
         guard !stopped else { return }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        p.executableURL = URL(fileURLWithPath: SSHBinary.path)
         p.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T",
                        destination, Self.script]
         var env = ProcessInfo.sanitizedEnvironment

@@ -103,7 +103,7 @@ extension TerminalTab {
         let dest = session.destinationString
         return await Task.detached {
             let p = Process(), err = Pipe()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+            p.executableURL = URL(fileURLWithPath: SSHBinary.path)
             p.arguments = ["-S", cp, "-O", op, f.flag, f.spec, "--", dest]
             p.environment = ProcessInfo.sanitizedEnvironment
             p.standardInput = FileHandle.nullDevice

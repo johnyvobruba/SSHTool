@@ -14,6 +14,11 @@ if let port = launchEnv["SSHTOOL_SERIAL_PORT"] {
                      rtscts: launchEnv["SSHTOOL_SERIAL_FLOW"] == "rtscts")
 }
 
+// Telnet: tatáž binárka jako most mezi terminálem (PTY) a TCP spojením (macOS klienta telnet nemá).
+if let host = launchEnv["SSHTOOL_TELNET_HOST"] {
+    TelnetBridge.run(host: host, port: Int(launchEnv["SSHTOOL_TELNET_PORT"] ?? "") ?? 23)
+}
+
 // Zápis do roury, kterou druhá strana zavřela (např. zavřený Wireshark), nesmí aplikaci shodit (SIGPIPE).
 signal(SIGPIPE, SIG_IGN)
 

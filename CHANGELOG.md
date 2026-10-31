@@ -507,7 +507,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 
 - Odeslat příkazy do relací: cíle se zobrazují pod **názvem záložky** (i přejmenované), ne pod názvem serveru –
   relace na různá zařízení přes stejný skokový server jdou rozlišit. Dvě nepřejmenované relace na stejný server
-  mají číslo („lom-chpmgmt 2“). V potvrzení a auditním logu je název záložky i skutečný server („mho2 (přes lom-chpmgmt · 10.105.100.7)“).
+  mají číslo („jump-mgmt 2“). V potvrzení a auditním logu je název záložky i skutečný server („sw-core2 (přes jump-mgmt · 192.0.2.7)“).
 
 ## 0.28.3
 
@@ -527,3 +527,23 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   (ACTIVE lesní zelená, STANDBY tlumená fialová, BOOTING tmavá okrová na #F1DFBA, IP olivová, hostname ořechová,
   rozhraní petrolejová, TX karamelová, RX švestková, chyby cihlová); původní pravidla do `rules-before-sandstone.json`.
 - Oprava: režim vzhledu „Světlý“ používal vždy Arctic Light – nyní použije zvolený světlý profil.
+
+## 0.29.0
+
+- **Telnet** (editor serveru → Protokol: Telnet, port 23): vestavěný klient – macOS už `telnet` nemá. Vyjednává
+  ECHO, SGA, velikost okna (NAWS) a typ terminálu. Funguje s logováním, odesíláním příkazů do relací i rozdělením okna.
+  Editor upozorní, že Telnet není šifrovaný.
+- **X11 forwarding** (Pokročilé SSH nastavení): Vypnuto / Nedůvěryhodné (`-X`, doporučeno) / Důvěryhodné (`-Y`);
+  upozornění na XQuartz. Import z cizího profilu převede `-Y` na `-X`.
+- **Poznámky k serveru**: pole v editoru, zobrazí se v tooltipu v levém panelu.
+- **Koš**: smazaný server jde do koše (Soubor → Koš…), lze ho obnovit i s heslem; trvalé smazání / vysypání koše;
+  položky starší 30 dní se mažou trvale při spuštění.
+- **Hromadná úprava** (Soubor → Hromadná úprava serverů…, nebo pravé tlačítko na složce): výběr serverů s filtrem
+  a změna jen zaškrtnutých vlastností – složka, uživatel, port, jump host, prostředí, barva, legacy algoritmy,
+  X11, KeepAlive, kontrola klíče serveru.
+- **Starší zařízení – legacy algoritmy** (editor serveru → Pokročilé SSH nastavení): pro konkrétní server přidá
+  k výchozím `ssh-rsa`, `diffie-hellman-group14/1-sha1`, CBC šifry a `hmac-sha1`. Použijí se jen algoritmy,
+  které klient ssh skutečně zná (`ssh -Q`), takže nová verze OpenSSH v macOS připojení neshodí chybou „Bad …“.
+- **Vlastní klient SSH** (Nastavení → Obecné → Klient SSH): místo `/usr/bin/ssh` lze použít např. Homebrew
+  OpenSSH – pro případ, že systémové OpenSSH algoritmus úplně odstraní. Používá ho terminál, SFTP (`sftp -S`),
+  monitor, tunely, Wireshark i test připojení. Zobrazí se verze (`ssh -V`).

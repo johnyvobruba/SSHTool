@@ -24,6 +24,12 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var extraArgs: String = ""
     /// Tunelování portů (-L / -R / -D), jen u SSH záložky.
     var forwards: [PortForward] = []
+    /// Starší zařízení: povolit legacy algoritmy (ssh-rsa, SHA-1 KEX, CBC, hmac-sha1) jen pro tento server.
+    var legacyAlgorithms = false
+    /// X11 forwarding: "" vypnuto, "untrusted" (-X), "trusted" (-Y).
+    var x11 = ""
+    /// Poznámky k serveru (zobrazí se v tooltipu a v editoru).
+    var notes = ""
     var hasStoredPassword = false
     /// Před použitím uloženého hesla vyžadovat Touch ID / heslo macOS (skutečný příznak je v Keychainu).
     var requireUserAuth = true
@@ -68,6 +74,10 @@ struct SSHSession: Codable, Identifiable, Hashable {
     var rdpDebugLog = false             // /log-level:DEBUG do logu relace
 
     var isRDP: Bool { proto == "rdp" }
+    var isTelnet: Bool { proto == "telnet" }
+
+    /// X11 forwarding jen pro SSH záložku: -X (nedůvěryhodné, doporučené) / -Y (důvěryhodné).
+    var x11Args: [String] { x11 == "trusted" ? ["-Y"] : x11 == "untrusted" ? ["-X"] : [] }
 
     var envTag: String { environment.isEmpty && production ? "prod" : environment }
 
@@ -81,7 +91,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
+        case id, name, host, port, user, group, colorHex, auth, identityFile, jumpHost, extraArgs, forwards, legacyAlgorithms, x11, notes, hasStoredPassword, requireUserAuth, agentSocket, useKeychain, favorite, production, environment, keepAlive, connectTimeout, hostKeyPolicy,
              proto, rdpDomain, rdpGateway, rdpSize, rdpMultiMon, rdpClipboard, rdpShareHome, rdpFolders, rdpAskFolder, rdpMacKeys, rdpScale, rdpMonitor, rdpAutoMonitor, rdpCertPolicy, rdpExtraArgs,
              rdpSecurity, rdpBpp, rdpGfx, rdpUDP, rdpAutoDetect, rdpDebugLog
     }
@@ -103,6 +113,7 @@ struct SSHSession: Codable, Identifiable, Hashable {
             a += ["-o", "PreferredAuthentications=password,keyboard-interactive",
                   "-o", "PubkeyAuthentication=no"]
         }
+        if legacyAlgorithms { a += SSHBinary.legacyOptions }
         if keepAlive > 0 { a += ["-o", "ServerAliveInterval=\(keepAlive)"] }
         if connectTimeout > 0 { a += ["-o", "ConnectTimeout=\(connectTimeout)"] }
         if ["ask", "yes", "accept-new"].contains(hostKeyPolicy) {
@@ -211,6 +222,8 @@ final class AppStore: ObservableObject {
         }
     }
 
+    @Published var trash: [TrashedSession] = [] { didSet { save(trash, to: "trash.json") } }
+
     @Published var snippets: [Snippet] = [] {
         didSet { save(snippets, to: "snippets.json") }
     }
@@ -219,6 +232,7 @@ final class AppStore: ObservableObject {
         didSet {
             save(settings, to: "settings.json")
             Prefs.current = settings
+            SSHBinary.custom = settings.sshPath
             GroupPalette.overrides = settings.groupColors
             if settings.scrollback != oldValue.scrollback {
                 NotificationCenter.default.post(name: AppSettings.scrollbackChanged, object: nil)
@@ -243,6 +257,7 @@ final class AppStore: ObservableObject {
                                                  attributes: [.posixPermissions: 0o700])
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         sessions = load("sessions.json") ?? []
+        trash = load("trash.json") ?? []
         if let r: [HighlightRule] = load("rules.json") {
             rules = r
         } else {
@@ -251,8 +266,11 @@ final class AppStore: ObservableObject {
         }
         settings = load("settings.json") ?? AppSettings()
         Prefs.current = settings
+        SSHBinary.custom = settings.sshPath
         let snapshot = settings
         DispatchQueue.global(qos: .utility).async { LogRetention.prune(snapshot) }   // retence logů
+        purgeOldTrash()                                                               // koš: starší 30 dní pryč
+        save(trash, to: "trash.json")                                                 // didSet se v init nevolá
         GroupPalette.overrides = settings.groupColors
         snippets = load("snippets.json") ?? Snippet.defaults
         AppStore.shared = self
@@ -300,9 +318,34 @@ final class AppStore: ObservableObject {
         sessions.append(c)
     }
 
+    /// Smazání = přesun do koše (uložené heslo zůstává, dokud se koš nevysype / neuplyne 30 dní).
     func delete(_ id: UUID) {
-        KeychainStore.delete(id.uuidString)
+        guard let s = session(id) else { return }
+        trash.removeAll { $0.session.id == id }
+        trash.insert(TrashedSession(session: s, deletedAt: Date()), at: 0)
         sessions.removeAll { $0.id == id }
+    }
+
+    func restore(_ id: UUID) {
+        guard let i = trash.firstIndex(where: { $0.session.id == id }) else { return }
+        var s = trash[i].session
+        trash.remove(at: i)
+        if sessions.contains(where: { $0.id == s.id }) { s.id = UUID(); s.hasStoredPassword = false }
+        sessions.append(s)
+    }
+
+    /// Trvalé smazání z koše včetně hesla v Klíčence.
+    func purge(_ id: UUID) {
+        KeychainStore.delete(id.uuidString)
+        trash.removeAll { $0.session.id == id }
+    }
+
+    func emptyTrash() { for t in trash { KeychainStore.delete(t.session.id.uuidString) }; trash = [] }
+
+    /// Položky starší 30 dní se při spuštění smažou trvale.
+    func purgeOldTrash() {
+        let limit = Date().addingTimeInterval(-30 * 86_400)
+        for t in trash where t.deletedAt < limit { purge(t.session.id) }
     }
 
     /// Session seskupené podle skupiny (abecedně), uvnitř podle názvu.
@@ -350,6 +393,8 @@ final class AppStore: ObservableObject {
             removed.append("tunely vypnuty (\(s.forwards.count)) – zapni je ručně v editoru")
             for i in s.forwards.indices { s.forwards[i].enabled = false; s.forwards[i].allowRemote = false }
         }
+        // důvěryhodné X11 (-Y) dává serveru plný přístup k displeji (zachytávání kláves) – z cizího profilu ne
+        if s.x11 == "trusted" { removed.append("důvěryhodné X11 → nedůvěryhodné"); s.x11 = "untrusted" }
         if s.rdpShareHome { removed.append("sdílení domovské složky"); s.rdpShareHome = false }
         if !s.rdpFolders.isEmpty { removed.append("sdílené složky (\(s.rdpFolders.count))"); s.rdpFolders = [] }
         if !s.rdpExtraArgs.isEmpty { removed.append("další argumenty FreeRDP („\(s.rdpExtraArgs)“)"); s.rdpExtraArgs = "" }
@@ -668,6 +713,10 @@ extension SSHSession {
         jumpHost = try c.decodeIfPresent(String.self, forKey: .jumpHost) ?? ""
         extraArgs = try c.decodeIfPresent(String.self, forKey: .extraArgs) ?? ""
         forwards = try c.decodeIfPresent([PortForward].self, forKey: .forwards) ?? []
+        legacyAlgorithms = try c.decodeIfPresent(Bool.self, forKey: .legacyAlgorithms) ?? false
+        let x = try c.decodeIfPresent(String.self, forKey: .x11) ?? ""
+        x11 = ["untrusted", "trusted"].contains(x) ? x : ""
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         hasStoredPassword = try c.decodeIfPresent(Bool.self, forKey: .hasStoredPassword) ?? false
         // starší záznamy: položky Keychainu příznak nemají → false (odpovídá skutečnosti)
         requireUserAuth = try c.decodeIfPresent(Bool.self, forKey: .requireUserAuth) ?? false
@@ -679,7 +728,8 @@ extension SSHSession {
         keepAlive = try c.decodeIfPresent(Int.self, forKey: .keepAlive) ?? 0
         connectTimeout = try c.decodeIfPresent(Int.self, forKey: .connectTimeout) ?? 0
         hostKeyPolicy = try c.decodeIfPresent(String.self, forKey: .hostKeyPolicy) ?? ""
-        proto = (try c.decodeIfPresent(String.self, forKey: .proto)) == "rdp" ? "rdp" : "ssh"
+        let pr = try c.decodeIfPresent(String.self, forKey: .proto) ?? "ssh"
+        proto = ["rdp", "telnet"].contains(pr) ? pr : "ssh"
         rdpDomain = try c.decodeIfPresent(String.self, forKey: .rdpDomain) ?? ""
         rdpGateway = try c.decodeIfPresent(String.self, forKey: .rdpGateway) ?? ""
         rdpSize = try c.decodeIfPresent(String.self, forKey: .rdpSize) ?? "dynamic"
@@ -750,4 +800,11 @@ extension Color {
                       Int((c.greenComponent * 255).rounded()),
                       Int((c.blueComponent * 255).rounded()))
     }
+}
+
+/// Smazaný server v koši.
+struct TrashedSession: Codable, Identifiable, Hashable {
+    var session: SSHSession
+    var deletedAt: Date
+    var id: UUID { session.id }
 }
