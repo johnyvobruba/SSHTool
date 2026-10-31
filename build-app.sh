@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="SSHTool"
 BUNDLE_ID="cz.local.sshtool"
-VERSION="${VERSION_OVERRIDE:-0.32.0}"
+VERSION="${VERSION_OVERRIDE:-0.32.1}"
 
 # Aktualizace z GitHub Releases: owner/repo (env GITHUB_REPO > git remote origin) a veřejný klíč podpisu
 UPDATE_REPO="${GITHUB_REPO:-}"
@@ -80,8 +80,16 @@ RPLIST
     # OpenSSL „legacy“ provider (MD4/RC4) – bez něj FreeRDP nemá NTLM, takže NLA/CredSSP
     # mimo doménu (Kerberos) selže. Načítá se dynamicky, dylibbundler ho nenajde → kopie ručně,
     # cesta se předává přes OPENSSL_MODULES při spuštění (RDP.swift).
-    LEGACY="$BREW_PREFIX/opt/openssl@3/lib/ossl-modules/legacy.dylib"
-    if [[ -f "$LEGACY" ]]; then
+    # Provider musí být ze STEJNÉ verze OpenSSL, kterou FreeRDP používá (Homebrew přešel na OpenSSL 4 →
+    # libcrypto.4.dylib; provider z openssl@3 se k ní nenačte a NLA tiše přestane fungovat).
+    CRYPTO="$(cd "$FW" && ls libcrypto.*.dylib 2>/dev/null | head -1)"
+    LEGACY=""
+    for d in "$BREW_PREFIX"/opt/openssl/lib "$BREW_PREFIX"/opt/openssl@*/lib; do
+      if [[ -n "$CRYPTO" && -f "$d/$CRYPTO" && -f "$d/ossl-modules/legacy.dylib" ]]; then
+        LEGACY="$d/ossl-modules/legacy.dylib"; break
+      fi
+    done
+    if [[ -n "$LEGACY" && -f "$LEGACY" ]]; then
       mkdir -p "$FW/ossl-modules"
       cp "$(realpath "$LEGACY")" "$FW/ossl-modules/legacy.dylib"
       chmod u+w "$FW/ossl-modules/legacy.dylib"
@@ -93,17 +101,22 @@ RPLIST
           install_name_tool -change "$dep" "@loader_path/../$b" "$FW/ossl-modules/legacy.dylib"
         fi
       done
+      # kontrola: žádná závislost mimo systém a přibalené knihovny (jinak se na jiném Macu nenačte)
+      BAD="$(otool -L "$FW/ossl-modules/legacy.dylib" | tail -n +2 | awk '{print $1}' | grep -v -E '^(/usr/lib/|/System/|@)' || true)"
+      if [[ -n "$BAD" ]]; then
+        echo "✗ legacy.dylib odkazuje mimo aplikaci: $BAD"; exit 1
+      fi
       codesign --force --sign "$IDENTITY" "$FW/ossl-modules/legacy.dylib" 2>/dev/null
-      echo "  + OpenSSL legacy provider (NTLM pro NLA)"
+      echo "  + OpenSSL legacy provider (NTLM pro NLA) z $(dirname "$(dirname "$(dirname "$LEGACY")")") pro $CRYPTO"
     elif [[ "${BUNDLE_FREERDP:-auto}" == "1" ]]; then
-      echo "✗ Chybí $LEGACY (OpenSSL legacy provider, nutný pro NTLM/NLA)"; exit 1
+      echo "✗ Chybí OpenSSL legacy provider pro $CRYPTO (nutný pro NTLM/NLA)"; exit 1
     else
       echo "  ! OpenSSL legacy provider nenalezen – NLA přes NTLM nebude fungovat"
     fi
     # verze přibalených závislostí (poznámky k vydání, sledování CVE)
     {
       echo "FreeRDP a závislosti přibalené v SSHTool $VERSION (Homebrew, $(date -u +%Y-%m-%d)):"
-      brew list --versions freerdp openssl@3 ffmpeg sdl3 sdl3_ttf sdl2 sdl2_ttf jpeg-turbo krb5 libusb cjson pkcs11-helper 2>/dev/null || true    # chybějící formule = nenulový kód
+      brew list --versions freerdp openssl openssl@3 ffmpeg sdl3 sdl3_ttf sdl2 sdl2_ttf jpeg-turbo krb5 libusb cjson pkcs11-helper 2>/dev/null || true    # chybějící formule = nenulový kód
       echo "Sestavení: $( ("$H/sdl-freerdp" /version 2>/dev/null || true) | head -1)"
     } > "$APP/Contents/Resources/FreeRDP-VERSIONS.txt"
     cp "$APP/Contents/Resources/FreeRDP-VERSIONS.txt" build/FreeRDP-VERSIONS.txt

@@ -597,3 +597,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Dialogy FreeRDP (certifikát, přihlášení) zůstávají nad ním.
   - Kliknutím jde skrýt, samo zmizí nejpozději po 45 s.
   - Vypnout jde v editoru RDP serveru (Zobrazení → *Plynulý přechod do celé obrazovky*).
+
+## 0.32.1
+
+- **Oprava NLA u RDP**: Homebrew přešel na OpenSSL 4. Přibalený FreeRDP ji používá, ale sestavení dál bralo legacy provider z OpenSSL 3.
+  - Provider se proto nenačetl, chyběla podpora NTLM a přihlášení přes NLA selhávalo. Relace se připojila až po dvou neúspěšných pokusech přes TLS, proto RDP trvalo tak dlouho.
+  - Sestavení teď bere provider ze stejné verze OpenSSL jako FreeRDP. Když chybí nebo odkazuje mimo aplikaci, build skončí chybou.
+- **Průběh připojování RDP**: nahoře na monitoru se zobrazí panel s fází připojení (spojení, certifikát, přihlašování NLA, licencování), uplynulým časem, číslem pokusu a tlačítkem Zrušit. Panel zmizí po přihlášení do Windows.
+- **Rychlejší kompatibilní režim**: když selže už přihlášení NLA, nezkouší se zbytečně režim bez GFX/UDP a rovnou se nabídne TLS.
+  - Když chybí NTLM (vadné sestavení), aplikace řekne proč a downgrade na TLS nenabízí.

@@ -162,6 +162,33 @@ final class RDPLauncher: ObservableObject {
     var onChange: (() -> Void)?
     /// Opona proti bliknutí při přechodu do celé obrazovky (viz RDPCurtain).
     private var curtains: [UUID: RDPCurtain] = [:]
+    /// Panel s průběhem připojování (fáze, čas, pokus) – viz RDPProgress.
+    private var progress: [UUID: RDPProgress] = [:]
+
+    private func endProgress(_ id: UUID) { progress[id]?.close(); progress[id] = nil }
+
+    /// Fáze připojení podle výstupu FreeRDP (nil = beze změny).
+    nonisolated static func phase(in text: String) -> String? {
+        var found: String?
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let t = raw.lowercased()
+            if t.contains("log_build_warn") || t.contains("openssl") { continue }   // úvodní varování sestavení
+            if t.contains("verify_cb") || t.contains("certificate") { found = "Ověřování certifikátu serveru" }
+            else if t.contains("nla") || t.contains("credssp") || t.contains("com.winpr.sspi") { found = "Přihlašování (NLA)" }
+            else if t.contains("licens") { found = "Licencování relace" }
+            else if t.contains("rdg_") || t.contains("gateway") { found = "Připojování přes RD Gateway" }
+        }
+        return found
+    }
+
+    /// Přibalený OpenSSL legacy provider se nenačetl → chybí MD4 → NTLM → NLA nemůže projít.
+    nonisolated static func ntlmBroken(_ log: String) -> Bool {
+        log.contains("LEGACY provider failed to load") || log.contains("md4: NTLM support not available")
+    }
+
+    nonisolated static func nlaFailed(_ log: String) -> Bool {
+        ["CONNECTION_STATE_NLA", "nla_recv", "credssp_auth", "SEC_E_NO_CREDENTIALS"].contains { log.contains($0) }
+    }
 
     func isRunning(_ id: UUID) -> Bool { running[id] != nil }
 
@@ -267,8 +294,13 @@ final class RDPLauncher: ObservableObject {
     }
 
     /// Další stupeň kompatibility: 1) bez GFX/UDP, 24 bit  2) TLS místo NLA (jen se souhlasem a jen při „Automaticky“).
-    static func nextStep(after s: SSHSession) -> (session: SSHSession, needsConsent: Bool)? {
+    static func nextStep(after s: SSHSession, log: String = "") -> (session: SSHSession, needsConsent: Bool)? {
         var n = s
+        // selhalo už přihlášení NLA → grafika/UDP nepomůže, rovnou nabídnout TLS (ušetří jeden zbytečný pokus)
+        if nlaFailed(log), s.rdpSecurity.isEmpty {
+            n.rdpSecurity = "tls"
+            return (n, true)
+        }
         if s.rdpGfx || s.rdpUDP || (s.rdpBpp != 24 && s.rdpBpp != 16) {
             n.rdpGfx = false; n.rdpUDP = false
             if n.rdpBpp != 16 { n.rdpBpp = 24 }
@@ -345,8 +377,12 @@ final class RDPLauncher: ObservableObject {
             guard !d.isEmpty else { h.readabilityHandler = nil; return }
             let text = String(decoding: d, as: UTF8.self)
             sink.write(text)
+            if !loggedOn.value, let ph = RDPLauncher.phase(in: text) {
+                DispatchQueue.main.async { self.progress[s.id]?.setPhase(ph) }
+            }
             if !loggedOn.value, RDPLauncher.logonMarkers.contains(where: { text.contains($0) }) {
                 loggedOn.value = true
+                DispatchQueue.main.async { self.endProgress(s.id) }
                 if tuned {
                     // přihlášení v upraveném režimu prošlo → uložit nastavení hned (ne až po 30 s)
                     DispatchQueue.main.async {
@@ -372,16 +408,32 @@ final class RDPLauncher: ObservableObject {
                 let byUser = self.stopping.remove(id) != nil
                 self.onChange?()
                 // relace proběhla (přihlášení) nebo ji ukončil uživatel → zavření okna není chyba
-                if loggedOn.value || byUser { return }
+                if loggedOn.value || byUser { self.endProgress(id); return }
                 // rychlé ukončení s chybou = chyba připojení / přihlášení
-                guard code != 0, Date().timeIntervalSince(started) < 90 else { return }
-                if errBox.value.contains("CONNECT_CANCELLED") { return }      // zrušeno uživatelem (okno/dialog)
+                guard code != 0, Date().timeIntervalSince(started) < 90 else { self.endProgress(id); return }
+                if errBox.value.contains("CONNECT_CANCELLED") { self.endProgress(id); return }   // zrušeno uživatelem (okno/dialog)
                 let log = errBox.value
-                if s.rdpAutoDetect, RDPLauncher.isRetryable(log), let step = RDPLauncher.nextStep(after: s) {
-                    if step.needsConsent, !self.confirmTLS(s) { return }
+                // chybí NTLM (vadné sestavení) → NLA nemůže projít; nenabízet downgrade na TLS, říct proč
+                if RDPLauncher.ntlmBroken(log), RDPLauncher.nlaFailed(log) {
+                    self.endProgress(id)
+                    let a = NSAlert(); a.alertStyle = .warning
+                    a.messageText = "RDP „\(name)“: přihlášení NLA v této verzi SSHTool nefunguje"
+                    a.informativeText = "Přibalenému FreeRDP chybí podpora NTLM (OpenSSL legacy provider se nenačetl), proto NLA selže. " +
+                        "Je to chyba sestavení aplikace, ne serveru – opraveno v další verzi.\n\n" +
+                        "Pokud jsi dříve potvrdil „Připojit přes TLS a zapamatovat“, vrať po aktualizaci v editoru serveru Zabezpečení na Automaticky."
+                    a.addButton(withTitle: "OK"); a.addButton(withTitle: "Zobrazit log")
+                    if a.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(FreeRDP.logURL(for: s)) }
+                    return
+                }
+                if s.rdpAutoDetect, RDPLauncher.isRetryable(log), let step = RDPLauncher.nextStep(after: s, log: log) {
+                    if step.needsConsent {
+                        self.progress[id]?.setPhase("Čeká na potvrzení")
+                        if !self.confirmTLS(s) { self.endProgress(id); return }
+                    }
                     self.start(bin: bin, session: step.session, password: password, tuned: true)
                     return
                 }
+                self.endProgress(id)
                 let lines = log.split(whereSeparator: \.isNewline).map(String.init)
                     .filter { $0.contains("ERROR") || $0.contains("error") || $0.contains("failed") }
                 let a = NSAlert()
@@ -395,6 +447,23 @@ final class RDPLauncher: ObservableObject {
                 if a.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(FreeRDP.logURL(for: s)) }
             }
         }
+        // panel s průběhem (při kompatibilním pokusu stejný panel, další číslo pokusu)
+        let hud: RDPProgress
+        if let h = progress[s.id], !h.closed {
+            hud = h
+            hud.nextAttempt(s.rdpSecurity == "tls" ? "Připojování přes TLS" : "Kompatibilní režim (bez GFX/UDP)")
+        } else {
+            hud = RDPProgress(name: s.name, screen: FreeRDP.targetScreen(s))
+            hud.setPhase("Navazování spojení s \(s.host):\(s.port)")
+            progress[s.id] = hud
+        }
+        let sid = s.id
+        hud.onCancel = { [weak self] in
+            guard let self else { return }
+            self.disconnect(sid)
+            self.curtains[sid]?.close(); self.curtains[sid] = nil
+            self.progress[sid] = nil
+        }
         // opona: na monitor relace dřív, než FreeRDP otevře první okno (při přepojení už může existovat)
         if curtains[s.id]?.ownerPID != 0 { curtains[s.id]?.close(animated: false); curtains[s.id] = nil }
         if curtains[s.id] == nil, RDPCurtain.enabled, s.rdpSize == "fullscreen", !s.rdpMultiMon,
@@ -405,6 +474,7 @@ final class RDPLauncher: ObservableObject {
             try p.run()
         } catch {
             curtains[s.id]?.close(animated: false); curtains[s.id] = nil
+            endProgress(s.id)
             sink.close("Spuštění selhalo: \(error.localizedDescription)\n")
             let a = NSAlert(); a.messageText = "FreeRDP nelze spustit"; a.informativeText = error.localizedDescription; a.runModal()
             return

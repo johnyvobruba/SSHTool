@@ -126,3 +126,105 @@ private final class CurtainView: NSView {
     override func mouseDown(with event: NSEvent) { onClick?() }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
+
+/// Průběh připojování RDP: malý panel nahoře uprostřed monitoru – fáze, uplynulý čas, číslo pokusu, Zrušit.
+/// Zmizí po přihlášení do Windows, po ukončení FreeRDP nebo zrušení.
+@MainActor
+final class RDPProgress: NSObject {
+    private let panel: NSPanel
+    private let title = NSTextField(labelWithString: "")
+    private let detail = NSTextField(labelWithString: "")
+    private var timer: Timer?
+    private let started = Date()
+    private var phase = "Spouštění"
+    private(set) var attempt = 1
+    private(set) var closed = false
+    var onCancel: (() -> Void)?
+
+    init(name: String, screen: NSScreen?) {
+        let size = NSSize(width: 400, height: 62)
+        let f = (screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+        panel = NSPanel(contentRect: NSRect(x: f.midX - size.width / 2, y: f.maxY - size.height - 28,
+                                            width: size.width, height: size.height),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+
+        let fx = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        fx.material = .hudWindow
+        fx.blendingMode = .behindWindow
+        fx.state = .active
+        fx.wantsLayer = true
+        fx.layer?.cornerRadius = 12
+        fx.layer?.masksToBounds = true
+        fx.appearance = NSAppearance(named: .darkAqua)
+
+        let spinner = NSProgressIndicator()
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.startAnimation(nil)
+        title.stringValue = "RDP · \(name)"
+        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        title.textColor = .white
+        title.lineBreakMode = .byTruncatingTail
+        detail.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
+        detail.textColor = NSColor(white: 0.8, alpha: 1)
+        detail.lineBreakMode = .byTruncatingTail
+        let texts = NSStackView(views: [title, detail])
+        texts.orientation = .vertical
+        texts.alignment = .leading
+        texts.spacing = 2
+        let cancel = NSButton(title: "Zrušit", target: self, action: #selector(cancelTapped))
+        cancel.bezelStyle = .rounded
+        cancel.controlSize = .small
+        let row = NSStackView(views: [spinner, texts, cancel])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 16, bottom: 0, right: 14)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        texts.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        texts.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        fx.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: fx.leadingAnchor), row.trailingAnchor.constraint(equalTo: fx.trailingAnchor),
+            row.topAnchor.constraint(equalTo: fx.topAnchor), row.bottomAnchor.constraint(equalTo: fx.bottomAnchor),
+        ])
+        panel.contentView = fx
+        refresh()
+        panel.orderFrontRegardless()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { self?.refresh() }
+        }
+        // pojistka – panel nesmí zůstat viset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 180) { [weak self] in self?.close() }
+    }
+
+    func setPhase(_ p: String) { guard !closed, p != phase else { return }; phase = p; refresh() }
+
+    func nextAttempt(_ note: String) { attempt += 1; phase = note; refresh() }
+
+    private func refresh() {
+        let s = Int(Date().timeIntervalSince(started))
+        detail.stringValue = "\(phase)… · \(s / 60):\(String(format: "%02d", s % 60))" + (attempt > 1 ? " · pokus \(attempt)" : "")
+    }
+
+    @objc private func cancelTapped() { onCancel?(); close() }
+
+    func close() {
+        guard !closed else { return }
+        closed = true
+        timer?.invalidate(); timer = nil
+        let p = panel
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.2
+            p.animator().alphaValue = 0
+        }, completionHandler: { p.orderOut(nil) })
+    }
+}
