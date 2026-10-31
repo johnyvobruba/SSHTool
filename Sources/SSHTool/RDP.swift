@@ -160,6 +160,8 @@ final class RDPLauncher: ObservableObject {
     /// Značky ve výstupu FreeRDP, že proběhlo přihlášení do Windows.
     static let logonMarkers = ["save_session_info", "Logon Extended Info", "LogonId"]
     var onChange: (() -> Void)?
+    /// Opona proti bliknutí při přechodu do celé obrazovky (viz RDPCurtain).
+    private var curtains: [UUID: RDPCurtain] = [:]
 
     func isRunning(_ id: UUID) -> Bool { running[id] != nil }
 
@@ -365,6 +367,7 @@ final class RDPLauncher: ObservableObject {
             sink.close("\n===== konec · kód \(code) · \(Int(Date().timeIntervalSince(started))) s\n")
             DispatchQueue.main.async {
                 if self.running[id] === proc { self.running[id] = nil }
+                if let c = self.curtains[id], c.ownerPID == proc.processIdentifier { c.close(); self.curtains[id] = nil }
                 self.stopWatch(id, pid: proc.processIdentifier)
                 let byUser = self.stopping.remove(id) != nil
                 self.onChange?()
@@ -392,9 +395,16 @@ final class RDPLauncher: ObservableObject {
                 if a.runModal() == .alertSecondButtonReturn { NSWorkspace.shared.open(FreeRDP.logURL(for: s)) }
             }
         }
+        // opona: na monitor relace dřív, než FreeRDP otevře první okno (při přepojení už může existovat)
+        if curtains[s.id]?.ownerPID != 0 { curtains[s.id]?.close(animated: false); curtains[s.id] = nil }
+        if curtains[s.id] == nil, RDPCurtain.enabled, s.rdpSize == "fullscreen", !s.rdpMultiMon,
+           let sc = FreeRDP.targetScreen(s) {
+            curtains[s.id] = RDPCurtain(screen: sc, title: "Připojování k \(s.name)…")
+        }
         do {
             try p.run()
         } catch {
+            curtains[s.id]?.close(animated: false); curtains[s.id] = nil
             sink.close("Spuštění selhalo: \(error.localizedDescription)\n")
             let a = NSAlert(); a.messageText = "FreeRDP nelze spustit"; a.informativeText = error.localizedDescription; a.runModal()
             return
@@ -405,6 +415,7 @@ final class RDPLauncher: ObservableObject {
             inPipe.fileHandleForWriting.write(Data((args + ["/p:\(pw)"]).joined(separator: "\n").utf8 + Data("\n".utf8)))
         }
         try? inPipe.fileHandleForWriting.close()
+        curtains[s.id]?.attach(pid: p.processIdentifier, loggedOn: loggedOn)
         running[s.id] = p
         onChange?()
         if s.rdpSize == "fullscreen", !s.rdpMultiMon, s.rdpAutoMonitor {
@@ -449,6 +460,11 @@ final class RDPLauncher: ObservableObject {
         t.rdpAskFolder = false
         t.rdpMonitorID = nil
         stopWatch(s.id)
+        // mezi ukončením staré a startem nové relace je jinak vidět plocha → opona hned na cílovém monitoru
+        if RDPCurtain.enabled, t.rdpSize == "fullscreen", !t.rdpMultiMon, let sc = FreeRDP.targetScreen(t) {
+            curtains[s.id]?.close(animated: false)
+            curtains[s.id] = RDPCurtain(screen: sc, title: "Přepojování relace \(s.name)\(monitor.map { " na \($0)" } ?? "")…")
+        }
         guard let p = running[s.id] else { launch(t); return }
         stopping.insert(s.id)
         p.terminate()

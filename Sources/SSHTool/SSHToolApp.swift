@@ -66,11 +66,11 @@ struct SSHToolApp: App {
             }
             // ⌘F / ⌘G – hledání ve výstupu aktivního terminálu
             CommandGroup(replacing: .textEditing) {
-                Button("Hledat ve výstupu…") { tabs.selected?.view.showFind() }
+                Button("Hledat ve výstupu…") { tabs.commandTarget?.view.showFind() }
                     .keyboardShortcut("f")
-                Button("Najít další") { tabs.selected?.view.findAgain(forward: true) }
+                Button("Najít další") { tabs.commandTarget?.view.findAgain(forward: true) }
                     .keyboardShortcut("g")
-                Button("Najít předchozí") { tabs.selected?.view.findAgain(forward: false) }
+                Button("Najít předchozí") { tabs.commandTarget?.view.findAgain(forward: false) }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
             }
             CommandMenu("Terminál") {
@@ -100,6 +100,8 @@ struct SSHToolApp: App {
                 Button("Zapnout / vypnout logování") { tabs.toggleLoggingSelected() }
                     .keyboardShortcut("l", modifiers: [.command, .shift])
                 Button("Duplikovat záložku") { tabs.duplicateSelected() }
+                Button("Samostatné okno / zpět do hlavního okna") { tabs.toggleDetachActive() }
+                    .keyboardShortcut("n", modifiers: [.command, .option])
                 Divider()
                 Button("Přidat panel – vedle") { tabs.split(.vertical) }
                     .keyboardShortcut("d", modifiers: [.command, .shift])

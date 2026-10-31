@@ -586,3 +586,14 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Přenosy přes `curl` z macOS; heslo jde přes stdin, ne v argumentech procesu.
   - „Nekontrolovat certifikát“ jen výslovně, s varováním; při importu cizího profilu se vypne.
   - Složky se přes FTP přenášejí jen po jednotlivých souborech.
+
+## 0.32.0
+
+- **Samostatná okna pro záložky**: pravé tlačítko na záložce → *Otevřít v samostatném okně*, nebo ⌥⌘N. Relace se nepřepojuje, terminál se jen přesune do nového okna.
+  - Příkazy z menu (⌘W, ⌘F, ⇧⌘R, ⌘L, logování…) míří na aktivní okno.
+  - Multi-send, broadcast a stav v seznamu serverů zahrnují i oddělená okna. „Připojit“ u serveru s relací v samostatném okně toto okno vyzvedne.
+  - Zpět do hlavního okna vede tlačítko *Do hlavního okna* nebo ⌥⌘N. Zavření okna u běžící relace nabídne vrátit ji do hlavního okna, nebo ji ukončit.
+- **RDP – plynulý přechod do celé obrazovky**: při připojení a přepojení na jiný monitor se cílový monitor zakryje černým pozadím s textem „Připojování…“. Pozadí zmizí, až okno relace pokryje celý monitor, takže plocha mezi tím nebliká.
+  - Dialogy FreeRDP (certifikát, přihlášení) zůstávají nad ním.
+  - Kliknutím jde skrýt, samo zmizí nejpozději po 45 s.
+  - Vypnout jde v editoru RDP serveru (Zobrazení → *Plynulý přechod do celé obrazovky*).

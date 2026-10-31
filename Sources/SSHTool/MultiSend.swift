@@ -27,7 +27,7 @@ final class MultiSendModel: ObservableObject {
     }
 
     static func candidates(_ tabs: TabManager) -> [TerminalTab] {
-        tabs.tabs.filter { $0.running && ($0.kind == .ssh || $0.kind == .serial || $0.kind == .telnet) }
+        tabs.allTabs.filter { $0.running && ($0.kind == .ssh || $0.kind == .serial || $0.kind == .telnet) }
     }
 
     /// Při otevření: zahodit ukončené relace; když nic nezbude, předvybrat všechny kromě PROD.

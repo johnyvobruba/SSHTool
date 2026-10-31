@@ -341,7 +341,7 @@ struct ServerContextMenu: View {
 
     @ViewBuilder private var telnetMenu: some View {
         if let live = tabs.liveTab(for: session.id) {
-            Button("Přejít na otevřenou relaci") { tabs.selectedID = live.id }
+            Button("Přejít na otevřenou relaci") { tabs.focus(live) }
             Button("Připojit znovu v nové záložce") { tabs.open(session) }
         } else {
             Button(session.isFTP ? "Otevřít soubory (FTP)" : "Připojit (Telnet)") { tabs.open(session) }
@@ -357,7 +357,7 @@ struct ServerContextMenu: View {
     @ViewBuilder private var sshMenu: some View {
         let live = tabs.liveTab(for: session.id)
         if let live {
-            Button("Přejít na otevřenou relaci") { tabs.selectedID = live.id }
+            Button("Přejít na otevřenou relaci") { tabs.focus(live) }
             Button("Odpojit") { tabs.disconnect(live.id) }
             Button("Připojit znovu v nové záložce") { tabs.open(session) }
         } else {
@@ -443,6 +443,7 @@ struct SessionRow: View {
 struct SessionEditor: View {
     @StateObject private var m: SessionEditorModel
     @StateObject private var tester = ConnectionTester()
+    @AppStorage("SSHTool.rdpCurtain") private var rdpCurtain = true
     @Environment(\.dismiss) private var dismiss
     private let onSave: (SSHSession, String?) -> Void
     private let groups: [String]
@@ -796,6 +797,9 @@ struct SessionEditor: View {
                 Text(m.session.rdpAutoMonitor
                      ? "Přesun: pravý ⇧ + Enter (okno) → přetáhnout na monitor → asi za 2 s se relace přepojí na celou obrazovku v jeho rozlišení. Windows relace i aplikace zůstanou."
                      : "Celá obrazovka převezme rozlišení tohoto monitoru. Přesun na jiný monitor ji ořízne – pravé tlačítko → „Přepojit na monitor“.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Plynulý přechod do celé obrazovky", isOn: $rdpCurtain)
+                Text("Při připojení a přepojení zakryje monitor černým pozadím, dokud se relace nezobrazí – bez bliknutí plochy. Platí pro všechny RDP servery.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)

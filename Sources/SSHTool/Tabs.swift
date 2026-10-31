@@ -216,7 +216,7 @@ final class TabManager: ObservableObject {
     func displayTitle(_ t: TerminalTab) -> String {
         if let c = t.customTitle, !c.isEmpty { return c }
         let base = t.kind == .ssh ? t.session.displayName : t.title
-        let same = tabs.filter { $0.session.id == t.session.id && $0.kind == t.kind && ($0.customTitle ?? "").isEmpty }
+        let same = allTabs.filter { $0.session.id == t.session.id && $0.kind == t.kind && ($0.customTitle ?? "").isEmpty }
         guard same.count > 1, let n = same.firstIndex(where: { $0.id == t.id }) else { return base }
         return "\(base) · \(n + 1)"
     }
@@ -249,7 +249,59 @@ final class TabManager: ObservableObject {
     }
 
     var selected: TerminalTab? { tabs.first { $0.id == selectedID } }
-    func tab(_ id: UUID) -> TerminalTab? { tabs.first { $0.id == id } }
+    func tab(_ id: UUID) -> TerminalTab? { allTabs.first { $0.id == id } }
+
+    // MARK: Samostatná okna (oddělené záložky)
+
+    /// Záložky přesunuté do vlastního okna – nejsou v liště hlavního okna, ale dál patří k aplikaci
+    /// (multi-send, broadcast, stav v levém panelu).
+    @Published private(set) var detached: [TerminalTab] = []
+    /// Záložka v samostatném okně, které je právě aktivní → na ni míří příkazy z menu (⌘W, ⌘F, ⇧⌘R…).
+    var keyDetachedID: UUID?
+    var allTabs: [TerminalTab] { tabs + detached }
+    var commandTarget: TerminalTab? {
+        if let k = keyDetachedID, let t = detached.first(where: { $0.id == k }) { return t }
+        return selected
+    }
+    func isDetached(_ id: UUID) -> Bool { detached.contains { $0.id == id } }
+
+    /// Přesune záložku z hlavního okna do nového samostatného okna (relace běží dál, nic se nepřepojuje).
+    func detachToWindow(_ id: UUID) {
+        guard let i = index(id) else { return }
+        let t = tabs[i]
+        if var p = panes, let pi = p.firstIndex(of: id) {
+            p.remove(at: pi)
+            panes = p.count >= 2 ? p : nil
+            if panes == nil, broadcast { broadcast = false }
+            if selectedID == id { selectedID = p.first }
+        }
+        tabs.remove(at: i)
+        if selectedID == id { selectedID = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)].id }
+        detached.append(t)
+        DetachedWindows.shared.open(t, manager: self)
+    }
+
+    /// Vrátí záložku ze samostatného okna do lišty hlavního okna (okno se zavře).
+    func attachToMain(_ id: UUID) {
+        guard let i = detached.firstIndex(where: { $0.id == id }) else { return }
+        let t = detached.remove(at: i)
+        if keyDetachedID == id { keyDetachedID = nil }
+        DetachedWindows.shared.forget(id)
+        tabs.append(t)
+        selectedID = t.id
+        DetachedWindows.showMainWindow()
+    }
+
+    /// ⌥⌘N: aktivní záložka hlavního okna → samostatné okno; v samostatném okně → zpět do hlavního.
+    func toggleDetachActive() {
+        if let k = keyDetachedID, isDetached(k) { attachToMain(k) }
+        else if let id = selectedID { detachToWindow(id) }
+    }
+
+    /// Přejít na relaci – v hlavním okně, nebo vyzvednout její samostatné okno.
+    func focus(_ t: TerminalTab) {
+        if isDetached(t.id) { DetachedWindows.shared.front(t.id) } else { selectedID = t.id }
+    }
     private func index(_ id: UUID?) -> Int? { tabs.firstIndex { $0.id == id } }
 
     func isVisible(_ id: UUID) -> Bool { panes?.contains(id) ?? (id == selectedID) }
@@ -259,7 +311,7 @@ final class TabManager: ObservableObject {
     /// Stav session pro levý panel (bere nejlepší stav ze záložek SSH/SFTP této session).
     func state(for sessionID: UUID) -> ConnState? {
         if RDPLauncher.shared.isRunning(sessionID) { return .connected }
-        let ts = tabs.filter { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .sftp) }
+        let ts = allTabs.filter { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .sftp || $0.kind == .ftp) }
         if ts.contains(where: { $0.state == .connected }) { return .connected }
         if ts.contains(where: { $0.state == .connecting }) { return .connecting }
         if ts.contains(where: { $0.state == .error }) { return .error }
@@ -268,7 +320,7 @@ final class TabManager: ObservableObject {
 
     /// ⌘R: odpojená záložka → znovu připojit, jinak Ctrl+R (hledání v historii příkazů).
     func smartR() {
-        guard let t = selected else { return }
+        guard let t = commandTarget else { return }
         if t.running { t.view.sendControl(0x12) } else { reconnect(t.id) }
     }
 
@@ -286,7 +338,7 @@ final class TabManager: ObservableObject {
             for other in self.broadcastTargets where other.id != t.id { other.view.sendRaw(data) }
         }
         t.view.onFocus = { [weak self, weak t] in
-            guard let self, let t, self.selectedID != t.id else { return }
+            guard let self, let t, self.selectedID != t.id, !self.isDetached(t.id) else { return }
             self.selectedID = t.id
         }
     }
@@ -351,7 +403,7 @@ final class TabManager: ObservableObject {
     /// Cíle: při rozdělení viditelné panely, jinak všechny běžící záložky (bez lokálních terminálů).
     var broadcastTargets: [TerminalTab] {
         if let p = panes { return p.compactMap { tab($0) }.filter { $0.running } }
-        return tabs.filter { $0.running && $0.kind != .local }
+        return allTabs.filter { $0.running && $0.kind != .local && $0.kind != .ftp }
     }
 
     /// Zapnutí vyžaduje potvrzení se seznamem relací.
@@ -428,9 +480,17 @@ final class TabManager: ObservableObject {
         insert(TerminalTab(session: s, kind: .serial, serial: SerialConfig(path: port.path, baud: baud)))
     }
 
-    func sendBreakToSelected() { selected?.view.sendBreak() }
+    func sendBreakToSelected() { commandTarget?.view.sendBreak() }
 
     func close(_ id: UUID) {
+        if let di = detached.firstIndex(where: { $0.id == id }) {
+            detached[di].view.stop()
+            detached.remove(at: di)
+            tabObservers[id] = nil
+            if keyDetachedID == id { keyDetachedID = nil }
+            DetachedWindows.shared.forget(id)
+            return
+        }
         guard let i = index(id) else { return }
         tabs[i].view.stop()
         tabs.remove(at: i)
@@ -451,6 +511,18 @@ final class TabManager: ObservableObject {
     }
 
     func reconnect(_ id: UUID) {
+        if let di = detached.firstIndex(where: { $0.id == id }) {
+            let old = detached[di]
+            old.view.stop()
+            let t = TerminalTab(session: old.session, kind: old.kind, serial: old.serial)
+            t.customTitle = old.customTitle
+            tabObservers[id] = nil
+            register(t)
+            detached[di] = t
+            if keyDetachedID == id { keyDetachedID = t.id }
+            DetachedWindows.shared.replace(id, with: t)
+            return
+        }
         guard let i = index(id) else { return }
         tabs[i].view.stop()
         let t = TerminalTab(session: tabs[i].session, kind: tabs[i].kind, serial: tabs[i].serial)
@@ -461,21 +533,21 @@ final class TabManager: ObservableObject {
     }
 
     func duplicate(_ id: UUID) {
-        guard let i = index(id), tabs[i].kind != .serial else { return }   // port je výhradní
-        open(tabs[i].session, kind: tabs[i].kind)
+        guard let t = tab(id), t.kind != .serial else { return }   // port je výhradní
+        open(t.session, kind: t.kind)
     }
 
     func openLocal() { open(.local, kind: .local) }
 
     /// Běžící SSH záložka serveru (pro „Připojit“ = přejít na otevřenou relaci).
     func liveTab(for sessionID: UUID) -> TerminalTab? {
-        tabs.first { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .telnet || $0.kind == .ftp) && $0.running }
+        allTabs.first { $0.session.id == sessionID && ($0.kind == .ssh || $0.kind == .telnet || $0.kind == .ftp) && $0.running }
     }
 
     /// Dvojklik / „Připojit“: otevřená relace → přepnout na ni, jinak nová záložka.
     func openOrFocus(_ s: SSHSession) {
         if s.isRDP { RDPLauncher.shared.launch(s); return }
-        if let t = liveTab(for: s.id) { selectedID = t.id } else { open(s) }
+        if let t = liveTab(for: s.id) { focus(t) } else { open(s) }
     }
 
     /// Nová relace jako další panel vedle aktivní záložky.
@@ -534,18 +606,18 @@ final class TabManager: ObservableObject {
     }
 
     func toggleLogging(_ id: UUID) {
-        guard let i = index(id) else { return }
-        tabs[i].toggleLogging()
+        guard let t = tab(id) else { return }
+        t.toggleLogging()
         objectWillChange.send()          // ať se překreslí kontextové menu lišty
     }
 
-    func toggleLoggingSelected() { if let id = selectedID { toggleLogging(id) } }
+    func toggleLoggingSelected() { if let id = commandTarget?.id { toggleLogging(id) } }
 
-    func closeSelected() { if let id = selectedID { close(id) } }
-    func clearSelected() { selected?.view.clearScreen() }
-    func sendControlToSelected(_ byte: UInt8) { selected?.view.sendControl(byte) }
-    func reconnectSelected() { if let id = selectedID { reconnect(id) } }
-    func duplicateSelected() { if let id = selectedID { duplicate(id) } }
+    func closeSelected() { if let id = commandTarget?.id { close(id) } }
+    func clearSelected() { commandTarget?.view.clearScreen() }
+    func sendControlToSelected(_ byte: UInt8) { commandTarget?.view.sendControl(byte) }
+    func reconnectSelected() { if let id = commandTarget?.id { reconnect(id) } }
+    func duplicateSelected() { if let id = commandTarget?.id { duplicate(id) } }
 }
 
 // MARK: - Hlavní okno
@@ -718,6 +790,7 @@ struct TerminalPane: View {
                 }
                 Menu {
                     Button("Přesunout do samostatné záložky") { tabs.detachPane(tab.id) }
+                    Button("Otevřít v samostatném okně") { tabs.detachToWindow(tab.id) }
                     Button("Rozdělit vedle  (vertikálně)") { tabs.splitFrom(tab.id, .vertical) }
                     Button("Rozdělit pod  (horizontálně)") { tabs.splitFrom(tab.id, .horizontal) }
                     Divider()
@@ -1013,6 +1086,8 @@ struct TabContextMenu: View {
             Button("Zobrazit pod aktivní záložkou") { tabs.split(with: tab.id, .horizontal) }
             Divider()
         }
+        Button("Otevřít v samostatném okně") { tabs.detachToWindow(tab.id) }
+        Divider()
         Button("Přejmenovat záložku…") { tabs.rename(tab.id) }
         if tab.customTitle != nil { Button("Obnovit původní název") { tabs.resetTitle(tab.id) } }
         Divider()
