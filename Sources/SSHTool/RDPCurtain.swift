@@ -274,7 +274,8 @@ final class RDPSessionBar: NSObject {
     var onWindowed: ((String) -> Void)?
     var onScale: ((Int) -> Void)?
     var onDisconnect: (() -> Void)?
-    private static let size = NSSize(width: 500, height: 32)
+    private static let size = NSSize(width: 530, height: 32)
+    static let positionKey = "SSHTool.rdpBarPosition"      // "left" | "center" | "right"; nic = podle displeje
     private static let titlebar: CGFloat = 28
 
     init(pid: Int32, session: SSHSession) {
@@ -309,10 +310,13 @@ final class RDPSessionBar: NSObject {
         let scale = Self.button("Měřítko", "textformat.size", self, #selector(scaleMenu(_:)))
         toggle = Self.button("Celá obrazovka", "arrow.up.left.and.arrow.down.right", self, #selector(toggleTapped))
         let eject = Self.button("Odpojit", "eject", self, #selector(ejectTapped))
+        let more = Self.button("", "ellipsis.circle", self, #selector(positionMenu(_:)))
+        more.imagePosition = .imageOnly
+        more.toolTip = "Umístění lišty (vlevo / uprostřed / vpravo)"
         res.toolTip = "Změnit rozlišení relace (přepojí, Windows aplikace zůstanou)"
         scale.toolTip = "Měřítko (DPI) ve Windows – uloží se k serveru a relace se přepojí"
         eject.toolTip = "Odpojit relaci (aplikace ve Windows běží dál)"
-        let row = NSStackView(views: [name, res, scale, toggle, eject])
+        let row = NSStackView(views: [name, res, scale, toggle, eject, more])
         row.orientation = .horizontal
         row.spacing = 6
         row.edgeInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 8)
@@ -397,6 +401,25 @@ final class RDPSessionBar: NSObject {
         popUp(m, from: sender)
     }
 
+    @objc private func positionMenu(_ sender: NSButton) {
+        let m = NSMenu()
+        let cur = UserDefaults.standard.string(forKey: Self.positionKey) ?? ""
+        for (title, v) in [("Automaticky (u displeje s výřezem vpravo)", ""), ("Vlevo", "left"), ("Uprostřed", "center"), ("Vpravo", "right")] {
+            let it = NSMenuItem(title: title, action: #selector(pickPosition(_:)), keyEquivalent: "")
+            it.target = self; it.representedObject = v
+            it.state = cur == v ? .on : .off
+            m.addItem(it)
+        }
+        popUp(m, from: sender)
+    }
+
+    @objc private func pickPosition(_ it: NSMenuItem) {
+        let v = it.representedObject as? String ?? ""
+        if v.isEmpty { UserDefaults.standard.removeObject(forKey: Self.positionKey) }
+        else { UserDefaults.standard.set(v, forKey: Self.positionKey) }
+        lastInside = Date()
+    }
+
     @objc private func scaleMenu(_ sender: NSButton) {
         let m = NSMenu()
         for v in [0, 100, 125, 150, 175, 200] {
@@ -466,9 +489,26 @@ final class RDPSessionBar: NSObject {
                                accessibilityDescription: toggle.title)
 
         // celá obrazovka: lišta visí z horního okraje; okno: pod titulkem, spouští se najetím na titulek
-        let top = fullscreen ? frame.maxY : frame.maxY - Self.titlebar
+        // displej s výřezem (notch): v celé obrazovce lištu dát vedle výřezu (vlevo/vpravo),
+        // uprostřed pak až pod něj – jinak by část lišty zakryl
+        let screen = NSScreen.screens.first { $0.localizedName == screenName }
+        let notch = fullscreen ? (screen?.safeAreaInsets.top ?? 0) : 0
+        let pos = UserDefaults.standard.string(forKey: Self.positionKey) ?? (notch > 0 ? "right" : "center")
+        var top = fullscreen ? frame.maxY : frame.maxY - Self.titlebar
         let width = min(Self.size.width, frame.width - 20)
-        let barFrame = NSRect(x: frame.midX - width / 2, y: top - Self.size.height - (fullscreen ? 2 : 4),
+        let x: CGFloat
+        switch pos {
+        case "left":
+            x = frame.minX + 12
+            if let l = screen?.auxiliaryTopLeftArea, notch > 0, l.width < width + 24 { top -= notch }   // vedle výřezu se nevejde
+        case "right":
+            x = frame.maxX - width - 12
+            if let r = screen?.auxiliaryTopRightArea, notch > 0, r.width < width + 24 { top -= notch }
+        default:
+            x = frame.midX - width / 2
+            top -= notch
+        }
+        let barFrame = NSRect(x: x, y: top - Self.size.height - (fullscreen ? 2 : 4),
                               width: width, height: Self.size.height)
         let mouse = NSEvent.mouseLocation
         let trigger = fullscreen

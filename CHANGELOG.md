@@ -651,3 +651,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Měřítko (DPI)** běžný FreeRDP za běhu měnit neumí, proto dál přepojuje (v menu je označené).
   - Volba v editoru RDP serveru: *Rozlišení a celou obrazovku měnit bez přepojení*.
   - Po přepnutí relace do okna už přesun okna na jiný monitor relaci nepřepojí.
+
+## 0.35.1
+
+- **Lišta RDP relace a výřez displeje (notch)**: v celé obrazovce na MacBooku s výřezem byla lišta uprostřed nahoře a výřez zakrýval část tlačítek a menu.
+  - Na displeji s výřezem je lišta automaticky vpravo vedle výřezu.
+  - Tlačítkem ⋯ na liště jde zvolit umístění: vlevo, uprostřed nebo vpravo; volba se pamatuje.
+  - Uprostřed, nebo když se lišta vedle výřezu nevejde, se posune pod výřez.
