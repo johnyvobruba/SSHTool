@@ -628,3 +628,14 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **Ikona aplikace podle barevného profilu**: ikona v Docku a v přepínači ⌘Tab se přebarví podle zvoleného profilu (pozadí, okno terminálu a zámek SSH v barvě zvýraznění). Midnight Graphite má původní ikonu.
   - Finder a Launchpad dál ukazují ikonu z balíčku; macOS za běhu mění jen ikonu v Docku.
   - Vypnout jde v Nastavení → Vzhled → Ikona aplikace.
+
+## 0.34.0
+
+- **Lišta RDP relace po najetí myší nahoru** (podobně jako lišta připojení ve Windows): nahrazuje tlačítko v titulku z verze 0.33.0.
+  - **Kdy se ukáže:** v celé obrazovce po najetí myší k hornímu okraji, u okna po najetí na titulek. Zmizí asi 1 s po odjetí myši.
+  - **Rozlišení:** podle okna (dynamické), pevné rozlišení v okně (1280×720 až 2560×1440), nebo celá obrazovka na zvoleném monitoru.
+  - **Měřítko:** DPI ve Windows (Automaticky, 100–200 %); uloží se k serveru.
+  - **Celá obrazovka / Okno:** přepínání jedním tlačítkem.
+  - **Odpojit:** ukončí relaci, aplikace ve Windows běží dál.
+  - Změny se provedou přepojením relace, Windows relace a otevřené aplikace zůstanou.
+  - Lištu jde vypnout v editoru RDP serveru.

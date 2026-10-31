@@ -253,51 +253,69 @@ final class RDPProgress: NSObject {
     }
 }
 
-/// Malá lišta v titulku okna RDP relace (okno, ne celá obrazovka): ⛶ Celá obrazovka a ⏏ Odpojit.
-/// Je to okno SSHTool, které sleduje polohu okna FreeRDP (CGWindowList) a je vidět jen, když je FreeRDP
-/// aktivní aplikace. Kliknutí FreeRDP neaktivuje SSHTool (neaktivující panel).
+/// Lišta relace RDP (jako „connection bar“ ve Windows): objeví se po najetí myší k hornímu okraji
+/// celé obrazovky, u okna nad titulkem. Rozlišení, měřítko, celá obrazovka / okno, odpojení.
+/// Je to neaktivující panel SSHTool nad oknem FreeRDP (poloha přes CGWindowList, myš přes NSEvent.mouseLocation –
+/// bez zvláštních oprávnění); vidět jen, když je FreeRDP aktivní aplikace.
 @MainActor
-final class RDPWindowBar: NSObject {
+final class RDPSessionBar: NSObject {
     static var enabled: Bool { UserDefaults.standard.object(forKey: "SSHTool.rdpToolbar") as? Bool ?? true }
 
+    let pid: Int32
+    private let session: SSHSession
     private let panel: NSPanel
     private var timer: Timer?
-    let pid: Int32
-    private var screenName: String?
     private var shown = false
+    private var lastInside = Date.distantPast
+    private var fullscreen = false
+    private var screenName: String?
+    private var toggle: NSButton!
     var onFullscreen: ((String?) -> Void)?
+    var onWindowed: ((String) -> Void)?
+    var onScale: ((Int) -> Void)?
     var onDisconnect: (() -> Void)?
-    private static let size = NSSize(width: 150, height: 22)
+    private static let size = NSSize(width: 500, height: 32)
+    private static let titlebar: CGFloat = 28
 
-    init(pid: Int32) {
+    init(pid: Int32, session: SSHSession) {
         self.pid = pid
+        self.session = session
         panel = NSPanel(contentRect: NSRect(origin: .zero, size: Self.size),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
-        panel.level = .floating
+        panel.level = .popUpMenu                     // nad oknem FreeRDP i v celé obrazovce
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle]
+        panel.hasShadow = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
 
         let fx = NSVisualEffectView(frame: NSRect(origin: .zero, size: Self.size))
         fx.material = .hudWindow
         fx.blendingMode = .behindWindow
         fx.state = .active
         fx.wantsLayer = true
-        fx.layer?.cornerRadius = 6
+        fx.layer?.cornerRadius = 9
         fx.layer?.masksToBounds = true
         fx.appearance = NSAppearance(named: .darkAqua)
-        let full = Self.button("Celá obrazovka", "arrow.up.left.and.arrow.down.right", target: self, action: #selector(fullTapped))
-        let eject = Self.button(nil, "eject", target: self, action: #selector(ejectTapped))
-        full.toolTip = "Přepojit na celou obrazovku tohoto monitoru (Windows relace a aplikace zůstanou)"
-        eject.toolTip = "Odpojit relaci"
-        let row = NSStackView(views: [full, eject])
+
+        let name = NSTextField(labelWithString: session.name)
+        name.font = .systemFont(ofSize: 12, weight: .semibold)
+        name.textColor = .white
+        name.lineBreakMode = .byTruncatingTail
+        name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let res = Self.button("Rozlišení", "aspectratio", self, #selector(resolutionMenu(_:)))
+        let scale = Self.button("Měřítko", "textformat.size", self, #selector(scaleMenu(_:)))
+        toggle = Self.button("Celá obrazovka", "arrow.up.left.and.arrow.down.right", self, #selector(toggleTapped))
+        let eject = Self.button("Odpojit", "eject", self, #selector(ejectTapped))
+        res.toolTip = "Změnit rozlišení relace (přepojí, Windows aplikace zůstanou)"
+        scale.toolTip = "Měřítko (DPI) ve Windows – uloží se k serveru a relace se přepojí"
+        eject.toolTip = "Odpojit relaci (aplikace ve Windows běží dál)"
+        let row = NSStackView(views: [name, res, scale, toggle, eject])
         row.orientation = .horizontal
-        row.spacing = 2
-        row.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 4)
+        row.spacing = 6
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 8)
         row.translatesAutoresizingMaskIntoConstraints = false
         fx.addSubview(row)
         NSLayoutConstraint.activate([
@@ -305,39 +323,110 @@ final class RDPWindowBar: NSObject {
             row.centerYAnchor.constraint(equalTo: fx.centerYAnchor),
         ])
         panel.contentView = fx
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             DispatchQueue.main.async { self?.update() }
         }
     }
 
-    private static func button(_ title: String?, _ symbol: String, target: AnyObject, action: Selector) -> NSButton {
-        let b = NSButton(title: title ?? "", target: target, action: action)
-        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title ?? symbol)
-        b.imagePosition = title == nil ? .imageOnly : .imageLeading
+    private static func button(_ title: String, _ symbol: String, _ target: AnyObject, _ action: Selector) -> NSButton {
+        let b = NSButton(title: title, target: target, action: action)
+        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
+        b.imagePosition = .imageLeading
         b.isBordered = false
-        b.font = .systemFont(ofSize: 11, weight: .medium)
+        b.font = .systemFont(ofSize: 11.5, weight: .medium)
         b.contentTintColor = NSColor(white: 0.92, alpha: 1)
-        b.controlSize = .small
+        b.setContentHuggingPriority(.required, for: .horizontal)
         return b
     }
 
-    @objc private func fullTapped() { onFullscreen?(screenName) }
-    @objc private func ejectTapped() { onDisconnect?() }
+    // MARK: Akce
+
+    @objc private func toggleTapped() {
+        hide()
+        if fullscreen { onWindowed?("dynamic") } else { onFullscreen?(screenName) }
+    }
+
+    @objc private func ejectTapped() { hide(); onDisconnect?() }
+
+    @objc private func resolutionMenu(_ sender: NSButton) {
+        let m = NSMenu()
+        let cur = fullscreen ? "fullscreen" : session.rdpSize
+        func add(_ title: String, _ value: String) {
+            let it = NSMenuItem(title: title, action: #selector(pickSize(_:)), keyEquivalent: "")
+            it.target = self; it.representedObject = value
+            it.state = value == cur || (value == "dynamic" && cur.isEmpty) ? .on : .off
+            m.addItem(it)
+        }
+        add("Podle velikosti okna (dynamické)", "dynamic")
+        m.addItem(.separator())
+        for r in ["1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440"] {
+            add(r.replacingOccurrences(of: "x", with: " × ") + " (okno)", r)
+        }
+        m.addItem(.separator())
+        let screens = NSScreen.screens.map(\.localizedName)
+        for sc in screens {
+            let it = NSMenuItem(title: screens.count > 1 ? "Celá obrazovka – \(sc)" : "Celá obrazovka",
+                                action: #selector(pickScreen(_:)), keyEquivalent: "")
+            it.target = self; it.representedObject = sc
+            it.state = fullscreen && sc == screenName ? .on : .off
+            m.addItem(it)
+        }
+        popUp(m, from: sender)
+    }
+
+    @objc private func scaleMenu(_ sender: NSButton) {
+        let m = NSMenu()
+        for v in [0, 100, 125, 150, 175, 200] {
+            let it = NSMenuItem(title: v == 0 ? "Automaticky" : "\(v) %", action: #selector(pickScale(_:)), keyEquivalent: "")
+            it.target = self; it.tag = v
+            it.state = session.rdpScale == v ? .on : .off
+            m.addItem(it)
+        }
+        popUp(m, from: sender)
+    }
+
+    private func popUp(_ m: NSMenu, from sender: NSButton) {
+        lastInside = Date()
+        m.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 6), in: sender)
+        lastInside = Date()                          // po zavření menu lištu hned neschovávat
+    }
+
+    @objc private func pickSize(_ it: NSMenuItem) {
+        guard let v = it.representedObject as? String else { return }
+        hide(); onWindowed?(v)
+    }
+    @objc private func pickScreen(_ it: NSMenuItem) {
+        guard let v = it.representedObject as? String else { return }
+        hide(); onFullscreen?(v)
+    }
+    @objc private func pickScale(_ it: NSMenuItem) { hide(); onScale?(it.tag) }
+
+    // MARK: Zobrazení po najetí myší
 
     private func update() {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
               let r = Self.mainWindow(pid: pid), let primary = NSScreen.screens.first else { hide(); return }
-        // CG (vlevo nahoře) → AppKit (vlevo dole)
-        let frame = NSRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)
+        let frame = NSRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)  // CG → AppKit
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: frame.midX, y: frame.midY)) }
         screenName = screen?.localizedName
-        // celá obrazovka / příliš malé okno → lišta není potřeba
-        if let sc = screen, frame.width >= sc.frame.width - 2, frame.height >= sc.frame.height * 0.9 { hide(); return }
-        guard frame.width > Self.size.width + 160 else { hide(); return }
-        let titlebar: CGFloat = 28
-        panel.setFrameOrigin(NSPoint(x: frame.maxX - Self.size.width - 10,
-                                     y: frame.maxY - titlebar + (titlebar - Self.size.height) / 2))
-        if !shown { panel.orderFrontRegardless(); shown = true }
+        fullscreen = screen.map { frame.width >= $0.frame.width - 2 && frame.height >= $0.frame.height * 0.9 } ?? false
+        toggle.title = fullscreen ? "Okno" : "Celá obrazovka"
+        toggle.image = NSImage(systemSymbolName: fullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                               accessibilityDescription: toggle.title)
+
+        // celá obrazovka: lišta visí z horního okraje; okno: pod titulkem, spouští se najetím na titulek
+        let top = fullscreen ? frame.maxY : frame.maxY - Self.titlebar
+        let width = min(Self.size.width, frame.width - 20)
+        let barFrame = NSRect(x: frame.midX - width / 2, y: top - Self.size.height - (fullscreen ? 2 : 4),
+                              width: width, height: Self.size.height)
+        let mouse = NSEvent.mouseLocation
+        let trigger = fullscreen
+            ? NSRect(x: frame.minX, y: frame.maxY - 4, width: frame.width, height: 6)
+            : NSRect(x: frame.minX, y: frame.maxY - Self.titlebar, width: frame.width, height: Self.titlebar + 2)
+        if trigger.contains(mouse) || (shown && barFrame.insetBy(dx: -16, dy: -16).contains(mouse)) { lastInside = Date() }
+        guard Date().timeIntervalSince(lastInside) < 0.8 else { hide(); return }
+        panel.setFrame(barFrame, display: true)
+        if !shown { panel.alphaValue = 1; panel.orderFrontRegardless(); shown = true }
     }
 
     private func hide() { if shown { panel.orderOut(nil); shown = false } }
@@ -349,7 +438,6 @@ final class RDPWindowBar: NSObject {
         var best: CGRect?
         for w in info {
             guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
-                  (w[kCGWindowLayer as String] as? Int) == 0,
                   let b = w[kCGWindowBounds as String] as? NSDictionary,
                   let r = CGRect(dictionaryRepresentation: b as CFDictionary), r.width >= 400, r.height >= 300 else { continue }
             if best == nil || r.width * r.height > best!.width * best!.height { best = r }

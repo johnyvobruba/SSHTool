@@ -808,7 +808,7 @@ struct SessionEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Více monitorů", isOn: $m.session.rdpMultiMon)
-            Toggle("Lišta „Celá obrazovka“ v titulku okna relace", isOn: $rdpToolbar)
+            Toggle("Lišta relace po najetí myší nahoru (rozlišení, měřítko, celá obrazovka, odpojit)", isOn: $rdpToolbar)
         }
         Section("Klávesnice a schránka") {
             Toggle("Sdílená schránka", isOn: $m.session.rdpClipboard)

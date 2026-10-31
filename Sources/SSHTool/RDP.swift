@@ -168,7 +168,7 @@ final class RDPLauncher: ObservableObject {
     /// Panel s průběhem připojování (fáze, čas, pokus) – viz RDPProgress.
     private var progress: [UUID: RDPProgress] = [:]
     /// Lišta „Celá obrazovka / Odpojit“ v titulku okna relace (jen relace v okně).
-    private var bars: [UUID: RDPWindowBar] = [:]
+    private var bars: [UUID: RDPSessionBar] = [:]
 
     private func endProgress(_ id: UUID) { progress[id]?.close(); progress[id] = nil }
 
@@ -497,9 +497,11 @@ final class RDPLauncher: ObservableObject {
         curtains[s.id]?.attach(pid: p.processIdentifier, loggedOn: loggedOn)
         progress[s.id]?.attach(pid: p.processIdentifier)
         bars[s.id]?.close(); bars[s.id] = nil
-        if RDPWindowBar.enabled, s.rdpSize != "fullscreen", !s.rdpMultiMon {
-            let bar = RDPWindowBar(pid: p.processIdentifier)
+        if RDPSessionBar.enabled, !s.rdpMultiMon {
+            let bar = RDPSessionBar(pid: p.processIdentifier, session: s)
             bar.onFullscreen = { [weak self] screen in self?.reconnect(s, monitor: screen ?? NSScreen.main?.localizedName) }
+            bar.onWindowed = { [weak self] size in self?.reconnectWindowed(s, size: size) }
+            bar.onScale = { [weak self] v in self?.setScale(s, v) }
             bar.onDisconnect = { [weak self] in self?.disconnect(sid) }
             bars[s.id] = bar
         }
@@ -560,9 +562,9 @@ final class RDPLauncher: ObservableObject {
     }
 
     /// Přepojí relaci z celé obrazovky do okna (dynamické rozlišení podle velikosti okna).
-    func reconnectWindowed(_ s: SSHSession) {
+    func reconnectWindowed(_ s: SSHSession, size: String = "dynamic") {
         var t = s
-        t.rdpSize = "dynamic"
+        t.rdpSize = size
         t.rdpMultiMon = false
         reconnect(t, monitor: nil)
     }
