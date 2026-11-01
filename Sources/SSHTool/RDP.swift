@@ -86,12 +86,31 @@ enum FreeRDP {
         return NSApp.keyWindow?.screen ?? NSApp.mainWindow?.screen ?? NSScreen.main
     }
 
+    /// Mezipaměť seznamu monitorů podle zapojení (názvy + rozložení) – pomocné spuštění FreeRDP jen při změně.
+    private static let monitorCache = Box<(key: String, list: [(id: Int, name: String)])?>(nil)
+
+    /// Klíč aktuálního zapojení monitorů (volat na hlavním vlákně).
+    @MainActor static var screensKey: String {
+        NSScreen.screens.map { "\($0.localizedName)@\(NSStringFromRect($0.frame))" }.joined(separator: "|")
+    }
+
+    static func listMonitors(bin: String, key: String = "") -> [(id: Int, name: String)] {
+        if !key.isEmpty, let c = monitorCache.value, c.key == key { return c.list }
+        let res = queryMonitors(bin: bin)
+        if !key.isEmpty, !res.isEmpty { monitorCache.value = (key, res) }
+        return res
+    }
+
     /// Monitory podle FreeRDP (`/list:monitor`): ID → název. Řádky typu „ * [1] [Built-in Retina Display] 1470x956 +0+0“.
-    static func listMonitors(bin: String) -> [(id: Int, name: String)] {
+    private static func queryMonitors(bin: String) -> [(id: Int, name: String)] {
         let p = Process(), out = Pipe()
         p.executableURL = URL(fileURLWithPath: bin)
         p.arguments = ["/list:monitor"]
         p.standardOutput = out; p.standardError = FileHandle.nullDevice
+        // SDL jako aplikace na pozadí: bez ikony v Docku a bez aktivace → žádné přepnutí aktivní aplikace (bliknutí)
+        var env = ProcessInfo.sanitizedEnvironment
+        env["SDL_MAC_BACKGROUND_APP"] = "1"
+        p.environment = env
         do { try p.run() } catch { return [] }
         let deadline = Date().addingTimeInterval(3)
         while p.isRunning && Date() < deadline { usleep(20_000) }
@@ -260,6 +279,7 @@ final class RDPLauncher: ObservableObject {
         // celá obrazovka: na kterém monitoru (název z macOS → ID podle FreeRDP)
         let wantFull = s.rdpSize == "fullscreen" && !s.rdpMultiMon
         let screenName = wantFull ? FreeRDP.targetScreen(s)?.localizedName : nil
+        let screensKey = wantFull ? FreeRDP.screensKey : ""
         let ref = s.passwordRef
         Task.detached {
             var password: String?
@@ -280,7 +300,7 @@ final class RDPLauncher: ObservableObject {
             }
             var t = s
             if let screenName {
-                t.rdpMonitorID = FreeRDP.listMonitors(bin: bin).first(where: { $0.name == screenName })?.id
+                t.rdpMonitorID = FreeRDP.listMonitors(bin: bin, key: screensKey).first(where: { $0.name == screenName })?.id
             }
             await MainActor.run { self.start(bin: bin, session: t, password: password) }
         }

@@ -668,3 +668,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 
 - **Vlastní ikona RDP klienta**: přibalený FreeRDP (SSHTool RDP) má v Docku vlastní ikonu: stejný motiv, ale kurzor myši místo „>_“ a na zámku nápis **RDP**. Ikonu při sestavení vykreslí sama binárka SSHTool.
   - Barvu podle profilu RDP ikona nemění: je to samostatná aplikace a macOS nedovolí jiné aplikaci měnit její ikonu v Docku za běhu. Má barvy výchozího profilu Midnight.
+
+## 0.35.4
+
+- **RDP – méně bliknutí při spuštění na celou obrazovku**:
+  - **Zjišťování monitorů na pozadí:** pomocné spuštění FreeRDP (`/list:monitor`) běží jako aplikace na pozadí (`SDL_MAC_BACKGROUND_APP=1`), bez ikony v Docku a bez přepnutí aktivní aplikace.
+  - **Mezipaměť monitorů:** seznam monitorů se pamatuje podle jejich zapojení. Pomocné spuštění tak proběhne jen poprvé nebo po změně monitorů.
+  - **Černé pozadí:** objeví se až po 0,35 s a pozvolna (0,3 s). Když je relace do té doby vidět, nezobrazí se vůbec, takže rychlé připojení je bez přechodu „obraz → černá → plocha“.

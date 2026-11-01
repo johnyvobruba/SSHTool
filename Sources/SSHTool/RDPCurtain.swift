@@ -38,13 +38,34 @@ final class RDPCurtain {
         v.onClick = { [weak self] in self?.close(animated: false) }
         p.setFrame(screen.frame, display: true)
         p.alphaValue = 0
-        p.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.15
-            p.animator().alphaValue = 1
-        }
+        // zobrazit až po chvíli a pozvolna: rychlé připojení se obejde bez opony (žádné „obraz → černá → plocha“)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in self?.reveal() }
         // pojistka: když se FreeRDP vůbec nespustí (zrušené heslo, chyba), opona nesmí zůstat
         DispatchQueue.main.asyncAfter(deadline: .now() + 45) { [weak self] in self?.close() }
+    }
+
+    private func reveal() {
+        guard !closed else { return }
+        // relace už je vidět (rychlé připojení) → opona není potřeba
+        if pid > 0, Self.hasLargeWindow(pid: pid) { close(animated: false); return }
+        let p = panel
+        p.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.3
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            p.animator().alphaValue = 1
+        }
+    }
+
+    private static func hasLargeWindow(pid: Int32) -> Bool {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return false }
+        return info.contains { w in
+            guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b as CFDictionary) else { return false }
+            return r.width >= 640 && r.height >= 400
+        }
     }
 
     /// Po spuštění FreeRDP: hlídat jeho okna (CGWindowList – bez zvláštních oprávnění).
