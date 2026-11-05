@@ -13,6 +13,33 @@ enum SSHBinary {
         return system
     }
 
+    /// Skutečná cesta (bez symbolických odkazů) – Homebrew má /opt/homebrew/bin/ssh jako odkaz do Cellaru.
+    static func resolved(_ p: String) -> String { URL(fileURLWithPath: p).resolvingSymlinksInPath().path }
+
+    /// Klient, kterému smí askpass vydat uložené heslo: vlastník root a zápis jen pro roota
+    /// (soubor i složka) – jinak by ho mohl podvrhnout jakýkoli program s právy uživatele
+    /// a přes askpass získat hesla z Klíčenky. /usr/bin/ssh (chráněný SIP) to splňuje.
+    static func isTrusted(_ p: String) -> Bool {
+        let real = resolved(p)
+        for item in [real, (real as NSString).deletingLastPathComponent] {
+            var st = stat()
+            guard stat(item, &st) == 0 else { return false }
+            if st.st_uid != 0 || (st.st_mode & (S_IWGRP | S_IWOTH)) != 0 { return false }
+        }
+        return true
+    }
+
+    /// Smí se aktuálnímu klientovi předávat uložená hesla (SSH_ASKPASS)?
+    static var askPassAllowed: Bool { isTrusted(path) }
+
+    /// Proč vlastní klient nesmí dostat uložená hesla (pro nastavení), nil = v pořádku.
+    static func trustProblem(_ p: String) -> String? {
+        guard !isTrusted(p) else { return nil }
+        return "Klient \(resolved(p)) nepatří uživateli root (nebo do něj / jeho složky smí zapisovat i jiný uživatel). "
+            + "Uložená hesla mu SSHTool nevydá – heslo zadáš v terminálu. Pro uložená hesla použij /usr/bin/ssh, "
+            + "nebo binárku zkopíruj např. do /usr/local/bin a nastav vlastníka root (sudo chown root:wheel, chmod 755)."
+    }
+
     /// `ssh -V` (verze OpenSSH) – pro nastavení.
     static func version(_ path: String) -> String? {
         let p = Process(), err = Pipe()

@@ -675,3 +675,12 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Zjišťování monitorů na pozadí:** pomocné spuštění FreeRDP (`/list:monitor`) běží jako aplikace na pozadí (`SDL_MAC_BACKGROUND_APP=1`), bez ikony v Docku a bez přepnutí aktivní aplikace.
   - **Mezipaměť monitorů:** seznam monitorů se pamatuje podle jejich zapojení. Pomocné spuštění tak proběhne jen poprvé nebo po změně monitorů.
   - **Černé pozadí:** objeví se až po 0,35 s a pozvolna (0,3 s). Když je relace do té doby vidět, nezobrazí se vůbec, takže rychlé připojení je bez přechodu „obraz → černá → plocha“.
+
+## 0.36.0 – bezpečnost
+
+- **Karanténa na stažené soubory**: vše stažené ze serveru (SFTP, SCP, FTP, stažení do levého panelu i pracovní kopie pro úpravy) dostane atribut karantény macOS jako soubory z prohlížeče. Spustitelné soubory tak při otevření zkontroluje Gatekeeper.
+- **Spustitelné typy se neotevřou bez potvrzení**: soubory `.command`, `.app`, `.pkg`, `.jar`, `.sh`, `.py`, `.terminal`, `.webloc` a podobné, i soubory bez přípony s právem spuštění.
+  - **Úprava v editoru:** jen jako text (`open -t`) po potvrzení, nikdy výchozí aplikací.
+  - **Dvojklik v panelu Mac:** volba *Otevřít jako text / Otevřít výchozí aplikací / Zrušit*.
+- **askpass vydá heslo jen důvěryhodnému klientovi ssh**: přesná cesta nastaveného klienta (ne jen program jménem „ssh“), vlastník root a zápis jen pro roota (soubor i složka). `/usr/bin/ssh` to splňuje.
+  - Vlastní klient, který tyto podmínky nesplňuje (např. Homebrew v `/opt/homebrew/bin`), uložená hesla nedostane: heslo se zadá v terminálu a v terminálu i v Nastavení → Obecné se zobrazí upozornění.

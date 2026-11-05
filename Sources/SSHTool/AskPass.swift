@@ -68,13 +68,19 @@ enum AskPass {
     }
 
     /// Řetězec rodičů: askpass ← ssh (← ssh u jump hostu …) ← hlavní aplikace SSHTool (stejná binárka).
+    /// ssh musí být přesně klient nastavený v SSHTool (ne jen program jménem „ssh“) a důvěryhodný
+    /// (vlastník root, bez zápisu pro ostatní) – podvržený klient by jinak dostal hesla z Klíčenky.
     static func calledFromSSHTool() -> Bool {
         guard let me = path(of: getpid()) else { return false }
+        // klienta předává SSHTool v prostředí; bezpečné, protože se níž vyžaduje vlastník root (podvrh nepomůže)
+        SSHBinary.custom = ProcessInfo.processInfo.environment["SSHTOOL_SSH_CLIENT"] ?? ""
+        let allowed = Set([SSHBinary.resolved(SSHBinary.path), SSHBinary.resolved(SSHBinary.system)]
+            .filter { SSHBinary.isTrusted($0) })
         var pid = getppid()
-        guard let first = path(of: pid), (first as NSString).lastPathComponent == "ssh" else { return false }
+        guard let first = path(of: pid), allowed.contains(first) else { return false }
         for _ in 0..<6 {
             guard let pp = parent(of: pid), pp > 1, let p = path(of: pp) else { return false }
-            if (p as NSString).lastPathComponent == "ssh" { pid = pp; continue }    // ProxyJump: ssh pod ssh
+            if allowed.contains(p) { pid = pp; continue }                              // ProxyJump: ssh pod ssh
             return p == me && pp != getpid()
         }
         return false

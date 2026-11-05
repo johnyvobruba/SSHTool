@@ -386,7 +386,8 @@ struct SettingsGeneralPane: View {
                     .help("ICMP ping k serveru – nevytváří SSH spojení ani záznamy v logu sshd. Pokud ICMP blokuje firewall, ukáže se „ICMP –“.")
             }
             SKRow("Klient SSH", help: (SSHBinary.version(SSHBinary.path).map { "\(SSHBinary.path) · \($0)" } ?? SSHBinary.path)
-                  + ". Vlastní klient (např. Homebrew OpenSSH) jen pokud systémový nezná potřebný algoritmus.") {
+                  + ". Vlastní klient (např. Homebrew OpenSSH) jen pokud systémový nezná potřebný algoritmus."
+                  + (SSHBinary.trustProblem(SSHBinary.path).map { "\n⚠️ " + $0 } ?? "")) {
                 HStack(spacing: 6) {
                     TextField("/usr/bin/ssh (systémový)", text: $store.settings.sshPath).skField(width: 200, mono: true)
                     Button("Vybrat…") {

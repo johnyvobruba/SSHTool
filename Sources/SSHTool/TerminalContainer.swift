@@ -108,11 +108,17 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
-        if kind == .ssh || kind == .sftp, session.usesStoredPassword, let exe = Bundle.main.executablePath {
+        // vlastní klient ssh, který nepatří rootovi (např. Homebrew), uložená hesla nedostane – heslo se zadá v terminálu
+        let untrustedClient = (kind == .ssh || kind == .sftp) && session.usesStoredPassword && !SSHBinary.askPassAllowed
+        if kind == .ssh || kind == .sftp, session.usesStoredPassword, !untrustedClient, let exe = Bundle.main.executablePath {
             env["SSH_ASKPASS"] = exe                 // ssh (i ssh pod sftp) zavolá naši vlastní binárku…
             env["SSH_ASKPASS_REQUIRE"] = "force"     // …i když má TTY (OpenSSH 8.4+)
             env["SSHTOOL_SESSION_ID"] = session.id.uuidString
+            env["SSHTOOL_SSH_CLIENT"] = SSHBinary.path
             if !session.passwordRef.isEmpty { env["SSHTOOL_PASSWORD_REF"] = session.passwordRef }
+        }
+        if untrustedClient {
+            feed(text: "\u{1B}[33m[Klient ssh \(SSHBinary.path) nepatří uživateli root – uložené heslo se mu z bezpečnostních důvodů nepředá. Zadej heslo ručně, nebo v Nastavení → Obecné použij /usr/bin/ssh.]\u{1B}[0m\r\n")
         }
         let envList = env.map { "\($0.key)=\($0.value)" }
         isRunning = true

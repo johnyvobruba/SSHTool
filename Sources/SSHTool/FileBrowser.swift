@@ -402,6 +402,8 @@ final class SFTPBrowser: ObservableObject {
         }
         Task {
             let r = await run(cmds, pid: pid)
+            // karanténa na vše stažené (i při částečném selhání) → Gatekeeper zkontroluje spustitelné soubory
+            for u in (single.map { [$0] } ?? items.map { targetDir.appendingPathComponent($0.name) }) { Quarantine.mark(u) }
             let reveal = single ?? (items.count == 1 ? targetDir.appendingPathComponent(items[0].name) : targetDir)
             finish(id, r.ok, r.ok ? "Uloženo do \(targetDir.path)" : Self.cleanErr(r.err), reveal: r.ok ? reveal : nil)
             then?()
@@ -534,7 +536,9 @@ final class SFTPBrowser: ObservableObject {
             a.informativeText = "Úpravy jsou určené pro konfigurace a skripty do 20 MB. Větší soubor stáhni a nahraj ručně."; a.runModal(); return
         }
         let remote = Self.join(path, e.name)
-        if let ex = edits.first(where: { $0.remotePath == remote }) { NSWorkspace.shared.open(ex.local); return }
+        if let ex = edits.first(where: { $0.remotePath == remote }) { SafeOpen.openForEditing(ex.local); return }
+        // spustitelný typ (.command, .sh, .jar…) upravovat jen jako text – výchozí aplikace by ho mohla spustit
+        if SafeOpen.isRisky(name: e.name), SafeOpen.confirm(e.name, allowDefault: false) == nil { return }
         let fm = FileManager.default
         let dir = Self.editRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
         do {
@@ -546,13 +550,10 @@ final class SFTPBrowser: ObservableObject {
             let r = await run(["get -p " + Self.q(remote) + " " + Self.q(local.path)])
             guard r.ok else { error = Self.cleanErr(r.err); try? fm.removeItem(at: dir); return }
             try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: local.path)
+            Quarantine.mark(local)
             let mod = (try? fm.attributesOfItem(atPath: local.path))?[.modificationDate] as? Date ?? Date()
             edits.append(EditSession(remotePath: remote, local: local, lastMod: mod, status: "Otevřeno – uložení v editoru = nahrání na server", confirmed: !production))
-            if !NSWorkspace.shared.open(local) {
-                // bez přiřazené aplikace (např. .conf) → TextEdit
-                let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open"); p.arguments = ["-t", local.path]
-                try? p.run()
-            }
+            SafeOpen.openForEditing(local)        // bez přiřazené aplikace (např. .conf) → TextEdit
             watchEdits()
         }
     }
@@ -563,7 +564,7 @@ final class SFTPBrowser: ObservableObject {
         edits.remove(at: i)
     }
 
-    func reopen(_ id: UUID) { if let e = edits.first(where: { $0.id == id }) { NSWorkspace.shared.open(e.local) } }
+    func reopen(_ id: UUID) { if let e = edits.first(where: { $0.id == id }) { SafeOpen.openForEditing(e.local) } }
 
     /// Každou sekundu kontroluje uložení pracovních kopií; změnu nahraje zpět na server.
     private func watchEdits() {
@@ -980,7 +981,7 @@ struct LocalFilePane: View {
                 }
             } primaryAction: { ids in
                 if let i = l.items.first(where: { ids.contains($0.id) }) {
-                    if i.isDir { l.go(i.url) } else { NSWorkspace.shared.open(i.url) }
+                    if i.isDir { l.go(i.url) } else { SafeOpen.open(i.url) }
                 }
             }
             Text("Dvojklik = otevřít · přetažením do pravého panelu nahraješ na server")
