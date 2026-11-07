@@ -1011,8 +1011,12 @@ struct DualFileBrowser: View {
                     LocalFilePane(l: local, b: b).frame(minWidth: 260)
                     FileBrowserPanel(b: b, embedded: true, localTarget: local).frame(minWidth: 320)
                 }
+                // HSplitView (AppKit) nepřekreslí obsah při změně prohlížeče → po přepnutí záložky zůstával
+                // vidět server předchozí relace. Nová identita podle prohlížeče = panely se postaví znovu.
+                .id(ObjectIdentifier(b))
             } else {
                 FileBrowserPanel(b: b, embedded: true)
+                    .id(ObjectIdentifier(b))
             }
         }
     }

@@ -684,3 +684,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Dvojklik v panelu Mac:** volba *Otevřít jako text / Otevřít výchozí aplikací / Zrušit*.
 - **askpass vydá heslo jen důvěryhodnému klientovi ssh**: přesná cesta nastaveného klienta (ne jen program jménem „ssh“), vlastník root a zápis jen pro roota (soubor i složka). `/usr/bin/ssh` to splňuje.
   - Vlastní klient, který tyto podmínky nesplňuje (např. Homebrew v `/opt/homebrew/bin`), uložená hesla nedostane: heslo se zadá v terminálu a v terminálu i v Nastavení → Obecné se zobrazí upozornění.
+
+## 0.36.1
+
+- **SFTP – po přepnutí záložky zůstával vidět předchozí server**: ve dvoupanelovém prohlížeči se po přepnutí na jinou SFTP záložku neobnovil obsah (AppKit `HSplitView` nepřekreslí panely při změně dat). Panely se teď při přepnutí záložky postaví znovu pro správnou relaci. Levý panel (Mac) si složku pamatuje dál.
