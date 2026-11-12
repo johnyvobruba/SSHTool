@@ -692,15 +692,33 @@ final class RDPLogSink: @unchecked Sendable {
         write(header)
     }
 
+    private var pending = ""
+
+    /// Do logu jen celé řádky: heslo rozdělené mezi dvě čtení z roury se tak spolehlivě zamaskuje.
     func write(_ text: String) {
-        var t = text
-        if let secret { t = t.replacingOccurrences(of: secret, with: "********") }
         lock.lock(); defer { lock.unlock() }
-        h?.write(Data(t.utf8))
+        pending += text
+        guard let nl = pending.lastIndex(where: \.isNewline) else {
+            if pending.count > 16_384 { flushLocked() }             // dlouhý řádek bez konce
+            return
+        }
+        let chunk = String(pending[...nl])
+        pending = String(pending[pending.index(after: nl)...])
+        h?.write(Data(mask(chunk).utf8))
+    }
+
+    private func mask(_ t: String) -> String {
+        guard let secret else { return t }
+        return t.replacingOccurrences(of: secret, with: "********")
+    }
+
+    private func flushLocked() {
+        if !pending.isEmpty { h?.write(Data(mask(pending).utf8)); pending = "" }
     }
 
     func close(_ footer: String) {
         write(footer)
+        lock.lock(); flushLocked(); lock.unlock()
         lock.lock(); defer { lock.unlock() }
         try? h?.close(); h = nil
     }

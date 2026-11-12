@@ -688,3 +688,18 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.36.1
 
 - **SFTP – po přepnutí záložky zůstával vidět předchozí server**: ve dvoupanelovém prohlížeči se po přepnutí na jinou SFTP záložku neobnovil obsah (AppKit `HSplitView` nepřekreslí panely při změně dat). Panely se teď při přepnutí záložky postaví znovu pro správnou relaci. Levý panel (Mac) si složku pamatuje dál.
+
+## 0.37.0 – bezpečnost (podle externího security review)
+
+- **[H-1, M-2] Import profilů – další argumenty ssh přes allowlist.** Původní kontrolu šlo obejít spojenými přepínači (`-voProxyCommand=…`), takže by se po připojení spustil příkaz na Macu. Totéž platilo pro `-A`, `-R`, `-L`, `-D` a `-Y`.
+  - Z importu teď projdou jen bezpečné volby `-o`: ServerAlive*, ConnectTimeout, Compression, LogLevel, algoritmy a podobné. Parsují se stejně jako v ssh.
+  - Ostatní argumenty se zahodí a vypíšou v hlášce po importu. Ruční zadání v editoru není omezené.
+  - **Doporučení:** u profilů importovaných dříve zkontroluj v editoru pole *Další argumenty* (hlavně tokeny začínající `-…o`, `-A`, `-R`, `-L`, `-D`).
+- **[M-1] Heslo jen cílovému serveru.** U relace přes jump host (ProxyJump) vydá askpass uložené heslo jen výzvě cílového serveru. Výzvu jump hostu obslouží dialog pro ruční zadání. Dřív mohl uložené heslo dostat i jump host z importovaného profilu.
+- **[I-3, L-2] Import:** přijetí nového klíče serveru bez dotazu (`accept-new`) se mění na dotaz s otiskem a automatické přijetí certifikátu RDP (`tofu`) se vypíná.
+- **[L-3] Bitwarden:** master heslo jde do `bw unlock` přes pojmenovanou rouru v soukromé složce, ne přes proměnnou prostředí.
+- **[L-4] Aktualizace:** přesná kontrola hostů u balíčku i podpisu (`github.com`, `*.githubusercontent.com`, jen HTTPS) a kontrola velikosti staženého souboru.
+- **[L-6] Telnet:** omezený buffer pro subnegotiation (server bez `IAC SE` už nemůže zahltit paměť).
+- **[L-7] Otevírání souborů ze serveru:** doplněné další rizikové typy (`saver`, `qlgenerator`, `appex`, `xpc`, `dylib`, Office s makry, `html`, `svg`…).
+- **[I-1] Log RDP:** zápis po celých řádcích, takže se maskuje i heslo rozdělené mezi dvě čtení výstupu.
+- **[I-2] Logování:** upozornění v Nastavení, že log obsahuje celý výstup terminálu včetně konfigurací.

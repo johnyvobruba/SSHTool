@@ -127,9 +127,15 @@ final class Updater: ObservableObject {
     // MARK: Instalace
 
     private func install(zip: Release.Asset, sig: Release.Asset, version v: String) {
+        // přesná kontrola hostů u obou souborů (hasSuffix("github.com") by prošlo i „evilgithub.com“)
+        func allowed(_ u: URL) -> Bool {
+            guard u.scheme == "https", let h = u.host?.lowercased() else { return false }
+            return h == "github.com" || h.hasSuffix(".githubusercontent.com")
+        }
         guard let zipURL = URL(string: zip.browser_download_url), let sigURL = URL(string: sig.browser_download_url),
-              zipURL.host?.hasSuffix("github.com") == true || zipURL.host?.hasSuffix("githubusercontent.com") == true,
+              allowed(zipURL), allowed(sigURL), zip.size > 0, zip.size <= 500_000_000, sig.size <= 4096,
               let key = publicKey else { return }
+        let expectedSize = zip.size
         status = "Stahuji \(v)…"; progress = 0
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("SSHTool-update-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -138,6 +144,11 @@ final class Updater: ObservableObject {
             do {
                 let (sigData, _) = try await URLSession.shared.data(from: sigURL)
                 let (zipFile, _) = try await URLSession.shared.download(from: zipURL)
+                // velikost musí sedět s údajem z GitHubu (a podpis nesmí být větší než pár set bajtů)
+                let size = ((try? FileManager.default.attributesOfItem(atPath: zipFile.path))?[.size] as? NSNumber)?.intValue ?? -1
+                guard size == expectedSize, sigData.count <= 4096 else {
+                    throw UpdateError("Stažený soubor nemá očekávanou velikost – instalace zrušena.")
+                }
                 let zipData = try Data(contentsOf: zipFile)
                 guard let sigText = String(data: sigData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                       let signature = Data(base64Encoded: sigText),

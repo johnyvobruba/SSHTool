@@ -780,7 +780,9 @@ struct SettingsLoggingPane: View {
 
     var body: some View {
         SKSection("Automatické ukládání") {
-            SKRow("Logovat každou novou záložku", help: "Jednotlivou záložku přepneš pravým tlačítkem na záložce nebo ⇧⌘L.", first: true) {
+            SKRow("Logovat každou novou záložku", help: "Jednotlivou záložku přepneš pravým tlačítkem na záložce nebo ⇧⌘L. "
+                  + "⚠️ Log obsahuje celý výstup terminálu – i konfigurace se sdílenými klíči, hashi hesel nebo community stringy (např. show running-config). "
+                  + "Soubory jsou čitelné jen pro tebe (0600); nesdílej je a nastav rozumnou dobu uchování.", first: true) {
                 SKToggle(isOn: $store.settings.logEnabled)
             }
             SKRow("Umístění logů") {

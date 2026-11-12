@@ -115,6 +115,8 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             env["SSH_ASKPASS_REQUIRE"] = "force"     // …i když má TTY (OpenSSH 8.4+)
             env["SSHTOOL_SESSION_ID"] = session.id.uuidString
             env["SSHTOOL_SSH_CLIENT"] = SSHBinary.path
+            env["SSHTOOL_TARGET"] = session.host
+            if !session.jumpHost.isEmpty { env["SSHTOOL_JUMP"] = "1" }
             if !session.passwordRef.isEmpty { env["SSHTOOL_PASSWORD_REF"] = session.passwordRef }
         }
         if untrustedClient {

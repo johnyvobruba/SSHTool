@@ -55,8 +55,8 @@ enum ExternalSecrets {
                 guard let master = askSecret("Bitwarden", "Master heslo pro odemčení trezoru (položka „\(body)“):") else {
                     return .failure(Failure(message: "Zrušeno."))
                 }
-                env["SSHTOOL_BW_PW"] = master
-                switch run(cli, ["unlock", "--passwordenv", "SSHTOOL_BW_PW", "--raw"], env: env) {
+                // master heslo přes pojmenovanou rouru (ne v proměnné prostředí, kterou vidí jiné procesy uživatele)
+                switch withSecretFIFO(master, { path in run(cli, ["unlock", "--passwordfile", path, "--raw"]) }) {
                 case .success(let token): env = ["BW_SESSION": token]
                 case .failure(let f): return .failure(Failure(message: "Bitwarden: odemčení selhalo – \(f.message)"))
                 }
@@ -73,6 +73,39 @@ enum ExternalSecrets {
             }
             return run(cli, ["show", "-q", "-s", "-a", "password", db, entry], stdin: pw + "\n")
         }
+    }
+
+    /// Tajemství pro CLI přes pojmenovanou rouru (FIFO) v soukromé složce 0700: nic se nezapisuje na disk
+    /// a hodnota není v argumentech ani v prostředí procesu. Roura se po použití smaže.
+    private static func withSecretFIFO(_ secret: String, _ body: (String) -> Result<String, Failure>) -> Result<String, Failure> {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("sshtool-\(UUID().uuidString)", isDirectory: true)
+        do { try fm.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]) }
+        catch { return .failure(Failure(message: "Nelze vytvořit dočasnou složku.")) }
+        let path = dir.appendingPathComponent("pw").path
+        defer { unlink(path); rmdir(dir.path) }
+        guard mkfifo(path, 0o600) == 0 else { return .failure(Failure(message: "Nelze vytvořit dočasnou rouru.")) }
+        let bytes = Array(secret.utf8)
+        let stop = Box<Bool>(false)
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            defer { done.signal() }
+            var fd: Int32 = -1
+            let deadline = Date().addingTimeInterval(20)
+            while !stop.value, Date() < deadline {                 // čekat, až si rouru otevře čtenář (CLI)
+                fd = open(path, O_WRONLY | O_NONBLOCK)
+                if fd >= 0 { break }
+                usleep(20_000)
+            }
+            guard fd >= 0 else { return }
+            _ = fcntl(fd, F_SETFL, 0)
+            bytes.withUnsafeBytes { _ = write(fd, $0.baseAddress, $0.count) }
+            close(fd)
+        }
+        let r = body(path)
+        stop.value = true
+        _ = done.wait(timeout: .now() + 2)
+        return r
     }
 
     private static func run(_ exe: String, _ args: [String], env extra: [String: String] = [:], stdin: String? = nil) -> Result<String, Failure> {

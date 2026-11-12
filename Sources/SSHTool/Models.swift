@@ -386,18 +386,49 @@ final class AppStore: ObservableObject {
                                       "match", "include", "pkcs11provider", "securitykeyprovider",
                                       "stricthostkeychecking", "userknownhostsfile", "globalknownhostsfile"]
 
+    /// Volby ssh, které smí obsahovat importovaný profil (vše ostatní se zahodí).
+    static let safeImportedOptions: Set<String> = [
+        "serveralivecountmax", "serveraliveinterval", "connecttimeout", "connectionattempts", "compression",
+        "loglevel", "tcpkeepalive", "addressfamily", "requesttty",
+        "kexalgorithms", "ciphers", "macs", "hostkeyalgorithms", "pubkeyacceptedalgorithms", "pubkeyacceptedkeytypes",
+    ]
+
+    /// Parsování jako ssh (getopt): povolené jsou jen tokeny „-o volba=hodnota“ / „-ovolba=hodnota“ s volbou
+    /// z allowlistu. Jakýkoli jiný přepínač (i spojený -vo…, -A, -R, -L, -D, -Y, -F, -J…) = nebezpečné.
+    static func importedExtraArgsAreSafe(_ args: String) -> Bool {
+        var it = args.split(whereSeparator: \.isWhitespace).map(String.init).makeIterator()
+        while let t = it.next() {
+            let value: String
+            if t == "-o" {
+                guard let v = it.next() else { return false }
+                value = v
+            } else if t.hasPrefix("-o"), t.count > 2 {
+                value = String(t.dropFirst(2))
+            } else {
+                return false
+            }
+            let key = value.split(whereSeparator: { $0 == "=" || $0.isWhitespace }).first.map { $0.lowercased() } ?? ""
+            guard safeImportedOptions.contains(key) else { return false }
+            // hodnota nesmí obsahovat substituce / řídicí znaky (u bezpečných voleb nemají smysl)
+            if value.contains(where: { "$`%;|&<>".contains($0) }) || value.unicodeScalars.contains(where: { $0.value < 32 }) { return false }
+        }
+        return true
+    }
+
     /// Importovaný profil je cizí obsah: odstraní nastavení, která by při připojení spustila příkaz na Macu
     /// nebo zpřístupnila jeho soubory. Vrací seznam odstraněného (pro hlášku).
     static func sanitizeImported(_ s: inout SSHSession) -> [String] {
         var removed: [String] = []
-        let low = s.extraArgs.lowercased().replacingOccurrences(of: " ", with: "")
-        let tokens = s.extraArgs.split(separator: " ").map(String.init)
-        let badOption = dangerousSSHOptions.contains { low.contains("-o" + $0) }
-        let badFlag = tokens.contains { ["-F", "-I", "-E"].contains($0) || $0.hasPrefix("-F") || $0.hasPrefix("-I") }
-        if badOption || badFlag {
-            removed.append("další argumenty ssh („\(s.extraArgs)“)")
+        // další argumenty ssh z cizího profilu: jen allowlist bezpečných voleb -o (denylist šel obejít
+        // spojenými přepínači podle getopt, např. -voProxyCommand=… → spuštění příkazu na Macu)
+        if !s.extraArgs.trimmingCharacters(in: .whitespaces).isEmpty, !importedExtraArgsAreSafe(s.extraArgs) {
+            removed.append("další argumenty ssh („\(s.extraArgs)“) – povolené jsou jen bezpečné volby -o, ostatní doplň ručně")
             s.extraArgs = ""
         }
+        // tiché přijetí klíče serveru (accept-new) z cizího profilu ne – první připojení ukáže otisk
+        if s.hostKeyPolicy == "accept-new" { removed.append("přijetí nového klíče serveru bez dotazu"); s.hostKeyPolicy = "ask" }
+        // RDP: důvěřovat certifikátu při prvním připojení (TOFU) z cizího profilu ne
+        if s.rdpCertPolicy == "tofu" { removed.append("automatické přijetí certifikátu RDP"); s.rdpCertPolicy = "" }
         // tunely z cizího profilu: vypnout a omezit na tento Mac (vzdálený tunel by otevřel cestu do Macu / sítě)
         if s.forwards.contains(where: { $0.enabled || $0.allowRemote }) {
             removed.append("tunely vypnuty (\(s.forwards.count)) – zapni je ručně v editoru")

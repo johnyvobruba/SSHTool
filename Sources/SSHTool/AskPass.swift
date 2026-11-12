@@ -29,6 +29,23 @@ enum AskPass {
             FileHandle.standardError.write(Data("sshtool: neznámý askpass dotaz: \(prompt)\n".utf8))
             exit(1)
         }
+        // Přes jump host (ProxyJump) běží dvě přihlášení: uložené heslo patří jen cílovému serveru.
+        // Výzvu jiného hostu (jump host – i podvržený z importovaného profilu) obslouží dialog na ruční zadání.
+        let env = ProcessInfo.processInfo.environment
+        if env["SSHTOOL_JUMP"] == "1", p.contains("password") {
+            let target = (env["SSHTOOL_TARGET"] ?? "").lowercased()
+            let asked = promptHost(prompt)?.lowercased()
+            if target.isEmpty || asked != target {
+                let who = asked ?? "jiný server (jump host)"
+                guard let typed = ExternalSecrets.askSecret("SSHTool – heslo pro \(who)",
+                        "Výzva nepatří cílovému serveru relace, uložené heslo se proto nepoužije.\n\n\(prompt.trimmingCharacters(in: .whitespacesAndNewlines))") else {
+                    FileHandle.standardError.write(Data("sshtool: heslo pro jiný host než cíl relace se nevydává\n".utf8))
+                    exit(1)
+                }
+                FileHandle.standardOutput.write(Data((typed + "\n").utf8))
+                exit(0)
+            }
+        }
         // Heslo z externího správce hesel (1Password / Bitwarden / KeePassXC) – ten si ověření řeší sám.
         if let ref = ProcessInfo.processInfo.environment["SSHTOOL_PASSWORD_REF"], !ref.isEmpty, p.contains("password") {
             switch ExternalSecrets.fetch(ref) {
@@ -50,6 +67,14 @@ enum AskPass {
         guard let secret = KeychainStore.password(for: sessionID) else { exit(1) }
         FileHandle.standardOutput.write(Data((secret + "\n").utf8))
         exit(0)
+    }
+
+    /// Host z výzvy ssh: „user@host's password:“ nebo „(user@host) Password:“; nil = výzva bez hostu.
+    static func promptHost(_ prompt: String) -> String? {
+        guard let re = try? NSRegularExpression(pattern: #"[^\s@()']+@([^\s'()]+?)(?:'s password|\))"#, options: [.caseInsensitive]),
+              let m = re.firstMatch(in: prompt, range: NSRange(prompt.startIndex..., in: prompt)),
+              let r = Range(m.range(at: 1), in: prompt) else { return nil }
+        return String(prompt[r])
     }
 
     // MARK: Ověření volajícího

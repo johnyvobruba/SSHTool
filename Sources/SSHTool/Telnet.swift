@@ -76,14 +76,14 @@ enum TelnetBridge {
                         }
                         state = 0
                     case 3:
-                        if b == IAC { state = 4 } else { sb.append(b) }
+                        if b == IAC { state = 4 } else if sb.count < 512 { sb.append(b) }   // limit: server bez IAC SE
                     default:
                         if b == SE {
                             if sb.count >= 2, sb[0] == TTYPE, sb[1] == 1 {       // TTYPE SEND
                                 send([IAC, SB, TTYPE, 0] + Array("XTERM-256COLOR".utf8) + [IAC, SE])
                             }
                             state = 0
-                        } else { if b == IAC { sb.append(IAC) }; state = 3 }
+                        } else { if b == IAC, sb.count < 512 { sb.append(IAC) }; state = 3 }
                     }
                 }
                 if !out.isEmpty { writeAll(STDOUT_FILENO, out) }

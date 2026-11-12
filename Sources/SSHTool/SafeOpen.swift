@@ -32,6 +32,9 @@ enum SafeOpen {
         "fileloc", "webloc", "inetloc", "url", "prefpane", "kext", "plugin", "osax", "bundle", "mobileconfig",
         "sh", "bash", "zsh", "csh", "ksh", "py", "pyw", "pl", "rb", "php", "js", "jxa",
         "exe", "msi", "bat", "cmd", "ps1", "vbs",
+        "saver", "qlgenerator", "mdimporter", "appex", "xpc", "systemextension", "wdgt", "service", "dylib",
+        "docm", "dotm", "xlsm", "xltm", "pptm", "potm",              // Office s makry
+        "html", "htm", "xhtml", "svg",                               // prohlížeč s lokálním file:// kontextem
     ]
 
     static func isRisky(name: String) -> Bool {
