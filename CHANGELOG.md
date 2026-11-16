@@ -717,3 +717,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Maestro:** volba Security Group nově funguje i pro fw monitor (`g_fw monitor`). Přibylo upozornění, že provoz v Maestro FastForward na SGM nedorazí.
   - **Limit -F:** kontrola na nejvýš 5 filtrů `-F`.
   - **VSX:** připomínka ověřit VSID.
+
+## 0.38.1
+
+- **Monitor – podrobnosti disku a CPU byly prázdné**: posuvná oblast v okénku neměla výšku a sbalila se, takže byla vidět jen hlavička `df -h`. Výška se teď řídí počtem řádků (nejvýš 280 px u disků a 260 px u jader, delší seznam jde posouvat).

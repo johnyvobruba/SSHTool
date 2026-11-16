@@ -519,7 +519,8 @@ struct MonitorDetailView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 260)
+                // ScrollView v popoveru nemá vlastní výšku (sbalí se na 0) → výška podle počtu řádků, max. 260
+                .frame(height: min(260, CGFloat((cores.count + cols - 1) / cols) * 18 + 2))
                 procList("Nejvíc CPU")
             case .ram:
                 ForEach(d.lines, id: \.self) { Text($0).font(mono) }
@@ -534,7 +535,7 @@ struct MonitorDetailView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 280)
+                .frame(height: min(280, CGFloat(d.disks.count) * 16 + 4))
             case .load:
                 ForEach(d.lines, id: \.self) { Text($0).font(mono) }
                 procList("Nejvíc CPU")
