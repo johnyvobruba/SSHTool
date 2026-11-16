@@ -19,8 +19,8 @@ final class CaptureModel: ObservableObject {
         var help: String {
             switch self {
             case .tcpdump: return "Linux / Gaia expert. Filtr BPF, rozhraní, rozsah portů, zápis do pcap."
-            case .fwF: return "Check Point R80.20+: rychlý filtr, funguje i s SecureXL. Port jen jeden (bez rozsahu), bez filtru rozhraní."
-            case .fwE: return "Check Point INSPECT filtr – umí rozsah portů. Akcelerovaný provoz (SecureXL) nemusí být vidět."
+            case .fwF: return "Check Point R80.20+ (doporučeno): -F \"src,sport,dst,dport,proto\" (0 = cokoli, víc -F = NEBO, max. 5). Zachytí i akcelerovaný provoz (SecureXL). Port jen jeden, bez filtru rozhraní."
+            case .fwE: return "Check Point INSPECT filtr – umí rozsah portů, ale NEZACHYTÍ akcelerovaný provoz (SecureXL) – výstup pak zůstane prázdný. Používej jen, když -F nestačí."
             }
         }
     }
@@ -41,7 +41,7 @@ final class CaptureModel: ObservableObject {
     @Published var lineBuffered = true    // -l  (řádkové bufferování – okamžitý výpis, i do | grep)
     @Published var noPromisc = true       // -p  (bez promiskuitního režimu)
     @Published var linkHeader = true      // -e  (MAC adresy / VLAN tag)
-    @Published var securityGroup = false  // Check Point Maestro / Scalable Platform: g_tcpdump na všech SGM
+    @Published var securityGroup = false  // Check Point Maestro / Scalable Platform: g_tcpdump / g_fw monitor na všech SGM
     @Published var useSudo = false        // Wireshark live / stažení: sudo -n (neinteraktivně)
     @Published var vsid = ""              // fw monitor: VSX virtuální systém (volitelně)
 
@@ -78,6 +78,7 @@ final class CaptureModel: ObservableObject {
         }
         if !t(port).isEmpty, portRange == nil { e.append("Port: číslo 1–65535 nebo rozsah 8000-8100") }
         if tool == .fwF, let r = portRange, r.0 != r.1 { e.append("fw monitor -F neumí rozsah portů – použij fw monitor -e nebo tcpdump") }
+        if tool == .fwF, fwFilters.count > 5 { e.append("fw monitor -F dovolí nejvýš 5 filtrů – zúž zadání (např. vypni Oba směry)") }
         if (proto == "icmp"), !t(port).isEmpty { e.append("ICMP nemá porty – port vynech") }
         if writeFile, !ok(t(file), Self.pathRe) { e.append("Soubor: absolutní cesta bez mezer, např. /var/log/capture.pcap") }
         if !t(vsid).isEmpty, Int(t(vsid)) == nil { e.append("VSID musí být číslo") }
@@ -89,7 +90,12 @@ final class CaptureModel: ObservableObject {
         var w: [String] = []
         if count == 0 { w.append("Bez limitu paketů – na vytíženém zařízení zatíží CPU i disk. Ukonči Ctrl+C.") }
         if t(src).isEmpty, t(dst).isEmpty, t(port).isEmpty, proto == "any" { w.append("Bez filtru se zachytí veškerý provoz.") }
-        if tool == .fwE { w.append("Akcelerovaný provoz nemusí být vidět – zvaž fw monitor -F (R80.20+).") }
+        if tool == .fwE { w.append("Filtr -e nezachytí akcelerovaný provoz (SecureXL) – výstup může zůstat prázdný, i když provoz běží. Pokud nepotřebuješ rozsah portů, přepni na fw monitor -F.") }
+        if tool != .tcpdump, securityGroup {
+            w.append("g_fw monitor běží na všech SGM – řádky mají prefix [chassis_SGM]." + (writeFile ? " Soubor (-o) vznikne na každém SGM zvlášť." : ""))
+            w.append("Provoz zařazený do Maestro FastForward zpracuje už orchestrátor (MHO) a na SGM nedorazí – fw monitor ho neuvidí ani s -F; zachyť ho na MHO.")
+        }
+        if tool != .tcpdump, !t(vsid).isEmpty { w.append("VSX: ověř, že VSID \(t(vsid)) je virtuální systém, přes který provoz opravdu teče (vsx stat -v).") }
         if tool == .tcpdump, securityGroup {
             w.append("g_tcpdump běží na všech členech (SGM) Security Group – spouštěj z SMO / člena SG v expert režimu; počet paketů platí pro každého člena.")
             if writeFile { w.append("S g_tcpdump vznikne soubor na každém SGM zvlášť (stejná cesta).") }
@@ -170,16 +176,23 @@ final class CaptureModel: ObservableObject {
     private var protoNum: Int { ["tcp": 6, "udp": 17, "icmp": 1][proto] ?? 0 }
 
     private var fwPrefix: [String] {
-        var a = ["fw monitor"]
+        var a = [securityGroup ? "g_fw monitor" : "fw monitor"]
         if !t(vsid).isEmpty { a.append("-v \(t(vsid))") }
         if count > 0 { a.append("-ci \(count) -co \(count)") }
         if writeFile { a.append("-o \(t(file))") }
         return a
     }
 
-    /// -F "src,sport,dst,dport,proto" – 0 = cokoli, více -F = logické OR.
+    /// -F "src,sport,dst,dport,proto" – 0 = cokoli, více -F = logické OR (max. 5).
     private var fwF: String {
         var a = fwPrefix
+        for f in fwFilters { a.append("-F \"\(f)\"") }
+        return a.joined(separator: " ")
+    }
+
+    /// Jednotlivé -F filtry bez duplicit. Port = služba; přidají se i odpovědi (zdrojový port),
+    /// aby byla vidět obě strany spojení – stejně jako -e "host(…) and (sport=… or dport=…)".
+    var fwFilters: [String] {
         let s = t(src).isEmpty ? "0" : t(src)
         let d = t(dst).isEmpty ? "0" : t(dst)
         let p = portRange.map { String($0.0) } ?? "0"
@@ -198,8 +211,7 @@ final class CaptureModel: ObservableObject {
             }
         }
         var seen = Set<String>()
-        for f in filters where seen.insert(f).inserted { a.append("-F \"\(f)\"") }
-        return a.joined(separator: " ")
+        return filters.filter { seen.insert($0).inserted }
     }
 
     /// Klasický INSPECT filtr: fw monitor -e "accept …;"
@@ -268,7 +280,6 @@ struct CaptureSheet: View {
                                 Text("0 = celý paket").font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                        Toggle("Security Group – Check Point Maestro (g_tcpdump na všech SGM)", isOn: $m.securityGroup)
                         LabeledContent("Přepínače") {
                             VStack(alignment: .leading, spacing: 4) {
                                 Toggle("-l  řádkové bufferování (výpis hned, i přes | grep)", isOn: $m.lineBuffered)
@@ -286,6 +297,8 @@ struct CaptureSheet: View {
                     } else {
                         TextField("VSX – VSID", text: $m.vsid, prompt: Text("volitelné, např. 2"))
                     }
+                    Toggle(m.tool == .tcpdump ? "Security Group – Check Point Maestro (g_tcpdump na všech SGM)"
+                                              : "Security Group – Check Point Maestro (g_fw monitor na všech SGM)", isOn: $m.securityGroup)
                     Toggle("Zapsat do souboru", isOn: $m.writeFile)
                     if m.writeFile {
                         TextField("Soubor", text: $m.file).font(.system(.body, design: .monospaced))

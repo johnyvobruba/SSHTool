@@ -703,3 +703,17 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 - **[L-7] Otevírání souborů ze serveru:** doplněné další rizikové typy (`saver`, `qlgenerator`, `appex`, `xpc`, `dylib`, Office s makry, `html`, `svg`…).
 - **[I-1] Log RDP:** zápis po celých řádcích, takže se maskuje i heslo rozdělené mezi dvě čtení výstupu.
 - **[I-2] Logování:** upozornění v Nastavení, že log obsahuje celý výstup terminálu včetně konfigurací.
+
+## 0.38.0
+
+- **Monitor serveru – podrobnosti po najetí myší** (podobně jako MobaXterm). Po najetí na úsek ve stavovém řádku (asi ½ s) nebo po kliknutí se otevře okénko s podrobnostmi:
+  - **CPU:** vytížení každého jádra (dva vzorky `/proc/stat` po 1 s) a procesy s největším využitím CPU.
+  - **RAM:** `free -m` a procesy s největším využitím paměti.
+  - **Disk:** `df -hP` bez tmpfs; řádky nad 85 % a 95 % jsou barevně zvýrazněné.
+  - **load:** `uptime`, počet jader, procesy a největší spotřebitelé CPU.
+  - Data se načtou jednorázově přes stejné SSH spojení (pevné skripty, jen čtení) a tlačítkem ↻ jdou načíst znovu. Okénko zmizí po odjetí myši.
+- **Průvodce zachytáváním – fw monitor:**
+  - **Varování u -e:** filtr `-e` nezachytí akcelerovaný provoz (SecureXL), takže výstup může zůstat prázdný. Průvodce na to jasně upozorní a doporučí `-F`.
+  - **Maestro:** volba Security Group nově funguje i pro fw monitor (`g_fw monitor`). Přibylo upozornění, že provoz v Maestro FastForward na SGM nedorazí.
+  - **Limit -F:** kontrola na nejvýš 5 filtrů `-F`.
+  - **VSX:** připomínka ověřit VSID.
