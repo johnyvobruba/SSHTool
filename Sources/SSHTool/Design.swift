@@ -114,12 +114,20 @@ final class TabBubble: ObservableObject {
     func hover(_ inside: Bool) {
         work?.cancel()
         guard inside else { if shown { shown = false }; return }
-        let w = DispatchWorkItem { [weak self] in self?.shown = true }
+        let w = DispatchWorkItem { [weak self] in
+            guard let self, !self.blocked else { return }
+            self.shown = true
+        }
         work = w
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: w)
     }
 
+    private var blocked = false
+
     func hide() { work?.cancel(); if shown { shown = false } }
+
+    /// Myš nad křížkem: bublinu skrýt a neukazovat (klik musí jít rovnou na zavření).
+    func block(_ on: Bool) { blocked = on; if on { hide() } }
 }
 
 /// Text se zvýrazněnou shodou s hledaným výrazem.
@@ -292,6 +300,15 @@ struct TabCard: View {
         if compact { compactBody } else { fullBody }
     }
 
+    /// „SSH · připojeno 3 min 12 s“ / „SSH · odpojeno“.
+    private var bubbleStatus: String {
+        let kind = tab.kind == .sftp ? "SFTP" : tab.kind == .local ? "Lokální" : tab.kind == .serial ? "Sériová"
+            : tab.kind == .telnet ? "Telnet" : tab.kind == .ftp ? "FTP" : "SSH"
+        let s = Int(Date().timeIntervalSince(tab.startedAt))
+        let dur = s >= 3600 ? "\(s / 3600) h \(s % 3600 / 60) min" : "\(s / 60) min \(s % 60) s"
+        return kind + " · " + (tab.state == .connected ? "připojeno \(dur)" : tab.state.label.lowercased())
+    }
+
     /// Host / IP pro bublinu (lokální terminál nic).
     private var hostLabel: String { tab.kind == .local ? "" : tab.session.host }
 
@@ -306,22 +323,27 @@ struct TabCard: View {
                 .font(.system(size: 11, weight: focused ? .semibold : .regular))
                 .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
                 .lineLimit(1)
-                .layoutPriority(1)
+                .frame(maxWidth: 140, alignment: .leading)          // dlouhý název se zkrátí „…“
             EnvBadge(tag: tab.session.envTag)
-            Spacer(minLength: 0)
             if tab.logging {
                 Image(systemName: "record.circle").font(.system(size: 8)).foregroundStyle(UI.error)
             }
-            Button(action: close) {
-                Image(systemName: "xmark").font(.system(size: 7, weight: .semibold))
+            // větší plocha pro kliknutí (samotný křížek je malý); nad křížkem se bublina nezobrazí,
+            // aby první klik nespotřebovalo její zavření
+            Button(action: { bubble.hide(); close() }) {
+                Image(systemName: "xmark").font(.system(size: 8, weight: .semibold))
+                    .frame(width: 16, height: 18)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(UI.textTertiary)
-            .help("Zavřít záložku (⌘W)")
+            .onHover { bubble.block($0) }
+            .padding(.leading, -2)
         }
-        .padding(.horizontal, 7)
+        .padding(.leading, 7).padding(.trailing, 3)
         .frame(height: 22)
-        .frame(minWidth: 84, maxWidth: 170)
+        .fixedSize(horizontal: true, vertical: false)              // karta jen tak široká, jak je potřeba
+        .frame(minWidth: 70)
         .background(RoundedRectangle(cornerRadius: 6).fill(selected ? UI.cardSelected : UI.card))
         .overlay(alignment: .bottom) {
             Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 6)
@@ -343,11 +365,12 @@ struct TabCard: View {
             if !hostLabel.isEmpty {
                 Text(hostLabel).font(.system(size: 13, weight: .semibold, design: .monospaced)).textSelection(.enabled)
             }
-            Text(tab.session.name + (tab.session.user.isEmpty || tab.kind == .local ? "" : " · \(tab.session.user)@")
-                 + (tab.kind == .local || tab.kind == .serial ? "" : ":\(tab.session.port)"))
+            Text([tab.session.name,
+                  tab.session.user.isEmpty || tab.kind == .local ? nil : "uživatel \(tab.session.user)",
+                  tab.kind == .local || tab.kind == .serial ? nil : "port \(tab.session.port)"]
+                    .compactMap { $0 }.joined(separator: " · "))
                 .font(.system(size: 11)).foregroundStyle(UI.textSecondary)
-            Text(tooltip.split(separator: "\n").dropFirst(2).joined(separator: " · "))
-                .font(.system(size: 10.5)).foregroundStyle(UI.textTertiary)
+            Text(bubbleStatus).font(.system(size: 10.5)).foregroundStyle(UI.textTertiary)
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
     }
