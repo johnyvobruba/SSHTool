@@ -276,6 +276,13 @@ struct TabCard: View {
         if compact { compactBody } else { fullBody }
     }
 
+    /// Host / IP za názvem (lokální terminál nic; když se název shoduje s hostem, neopakovat).
+    private var hostLabel: String {
+        guard tab.kind != .local else { return "" }
+        let h = tab.session.host
+        return h.isEmpty || title.contains(h) ? "" : h
+    }
+
     /// Jeden řádek: barva serveru · stav · název · prostředí · zavřít (host a typ jsou v nápovědě).
     private var compactBody: some View {
         HStack(spacing: 5) {
@@ -287,6 +294,14 @@ struct TabCard: View {
                 .font(.system(size: 11, weight: focused ? .semibold : .regular))
                 .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
                 .lineLimit(1)
+                .layoutPriority(1)
+            if !hostLabel.isEmpty {
+                Text(hostLabel)                                                  // IP / host malým písmem
+                    .font(.system(size: 9.5).monospacedDigit())
+                    .foregroundStyle(UI.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
             EnvBadge(tag: tab.session.envTag)
             Spacer(minLength: 0)
             if tab.logging {
@@ -300,8 +315,8 @@ struct TabCard: View {
             .help("Zavřít záložku (⌘W)")
         }
         .padding(.horizontal, 7)
-        .frame(height: 24)
-        .frame(minWidth: 84, maxWidth: 170)
+        .frame(height: 22)
+        .frame(minWidth: 84, maxWidth: 240)
         .background(RoundedRectangle(cornerRadius: 6).fill(selected ? UI.cardSelected : UI.card))
         .overlay(alignment: .bottom) {
             Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 6)

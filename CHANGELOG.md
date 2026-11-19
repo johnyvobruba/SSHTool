@@ -733,3 +733,10 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.40.0
 
 - **Kompaktní záložky**: karty relací mají jeden řádek a menší písmo (výška 24 px místo 38 px, šířka 84–170 px). V liště se tak vejde víc otevřených relací a lišta je nižší. Řádek obsahuje barvu serveru, stav, název, štítek prostředí a tlačítko zavřít; host a typ relace jsou v nápovědě po najetí myší. Původní dvouřádkové karty zapneš v Nastavení → Obecné → *Kompaktní záložky*.
+
+## 0.40.1
+
+- **Kompaktní záložky**:
+  - Za názvem relace je malým písmem IP / host. Neopakuje se, když je už v názvu, a lokální terminál ho nemá.
+  - Lišta záložek je nižší (34 px místo 54 px), karty mají výšku 22 px.
+  - Menší je i tlačítko + a ikony v liště.

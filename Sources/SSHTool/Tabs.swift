@@ -864,8 +864,8 @@ struct TabBar: View {
 
     private func chromeButton(_ icon: String, active: Bool = false) -> some View {
         Image(systemName: icon)
-            .font(.system(size: 13))
-            .frame(width: 28, height: 26)
+            .font(.system(size: compactTabs ? 12 : 13))
+            .frame(width: compactTabs ? 24 : 28, height: compactTabs ? 22 : 26)
             .background(RoundedRectangle(cornerRadius: 6).fill(active ? UI.cardSelected : SwiftUI.Color.clear))
             .foregroundStyle(active ? UI.text : UI.textSecondary)
             .contentShape(Rectangle())
@@ -894,7 +894,7 @@ struct TabBar: View {
                     }
                     NewTabMenu()
                 }
-                .padding(.vertical, compactTabs ? 4 : 8)
+                .padding(.vertical, compactTabs ? 3 : 8)
             }
 
             if tabs.tabs.count > 1 {
@@ -1020,7 +1020,7 @@ struct TabBar: View {
         .padding(.horizontal, 8)
         // se skrytým levým panelem je vlevo nahoře semafor okna
         .padding(.leading, tabs.sidebar == .detailOnly ? 70 : 0)
-        .frame(height: 54)
+        .frame(height: compactTabs ? 34 : 54)
         .background(UI.chrome)
         .background(WindowDragHandle(onDoubleClick: { tabs.showPicker = true }))   // dvojklik do prázdna = nová záložka
         .sheet(isPresented: $tabs.showQuickConnect) {
@@ -1031,6 +1031,7 @@ struct TabBar: View {
 
 /// „+“ – nová záložka.
 struct NewTabMenu: View {
+    @AppStorage("SSHTool.compactTabs") private var compact = true
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var tabs: TabManager
     @EnvironmentObject private var serial: SerialMonitor
@@ -1066,13 +1067,13 @@ struct NewTabMenu: View {
                 }
             }
         } label: {
-            Image(systemName: "plus").font(.system(size: 14, weight: .medium))
+            Image(systemName: "plus").font(.system(size: compact ? 11 : 14, weight: .medium))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .frame(width: 34, height: 38)
-        .background(RoundedRectangle(cornerRadius: 8).fill(UI.card))
+        .frame(width: compact ? 24 : 34, height: compact ? 22 : 38)
+        .background(RoundedRectangle(cornerRadius: compact ? 6 : 8).fill(UI.card))
         .help("Nová záložka")
     }
 }
