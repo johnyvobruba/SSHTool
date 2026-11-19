@@ -721,3 +721,11 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.38.1
 
 - **Monitor – podrobnosti disku a CPU byly prázdné**: posuvná oblast v okénku neměla výšku a sbalila se, takže byla vidět jen hlavička `df -h`. Výška se teď řídí počtem řádků (nejvýš 280 px u disků a 260 px u jader, delší seznam jde posouvat).
+
+## 0.39.0
+
+- **Zvýrazňování i v celoobrazovkových aplikacích** (`watch`, `top`, `less`, `vim`, `mc`…): nová volba v Nastavení → Obecné. Ve výchozím stavu je vypnutá.
+  - Celoobrazovkové aplikace (ncurses) často překreslují jen změněné znaky, takže zvýraznění může být neúplné nebo poblikávat.
+  - U `watch -d` se barvy pravidel míchají s inverzí změn.
+  - Rozvržení obrazovky se nerozbije (barevné sekvence nemají šířku).
+  - Změna platí okamžitě i v otevřených záložkách.

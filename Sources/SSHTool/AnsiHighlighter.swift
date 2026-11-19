@@ -65,6 +65,9 @@ final class AnsiHighlighter {
     private var pending: [UInt8] = []
     private var sgrState: [UInt8] = []
     private var altScreen = false
+    /// Volba v Nastavení: zvýrazňovat i v celoobrazovkových aplikacích (watch, top…). Čte se na začátku bloku.
+    static let altScreenKey = "SSHTool.highlightAltScreen"
+    private var allowAltScreen = false
     private static let reset: [UInt8] = Array("\u{1B}[0m".utf8)
     private static let maxSegment = 64 * 1024                 // B textu mezi escape sekvencemi
     private static let ruleBudget: UInt64 = 8_000_000         // 8 ms na pravidlo a blok
@@ -72,6 +75,7 @@ final class AnsiHighlighter {
 
     func process(_ chunk: ArraySlice<UInt8>) -> [UInt8] {
         compiled = HighlightCenter.shared.compiled
+        allowAltScreen = UserDefaults.standard.bool(forKey: Self.altScreenKey)
         let d = pending + Array(chunk)
         pending.removeAll(keepingCapacity: true)
         var out: [UInt8] = []
@@ -104,7 +108,7 @@ final class AnsiHighlighter {
     private func emitText(_ bytes: ArraySlice<UInt8>, into out: inout [UInt8]) {
         guard !bytes.isEmpty else { return }
         // pojistka: velké bloky (cat velkého souboru) se nezvýrazňují, terminál nesmí zamrznout
-        guard !altScreen, !compiled.isEmpty, bytes.count <= Self.maxSegment,
+        guard !altScreen || allowAltScreen, !compiled.isEmpty, bytes.count <= Self.maxSegment,
               let text = String(bytes: bytes, encoding: .utf8) else {
             out += bytes
             return

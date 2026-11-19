@@ -368,6 +368,7 @@ struct SettingsRootView: View {
 // MARK: - Obecné (Rozhraní a chování)
 
 struct SettingsGeneralPane: View {
+    @AppStorage("SSHTool.highlightAltScreen") private var highlightAltScreen = false
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
@@ -380,6 +381,10 @@ struct SettingsGeneralPane: View {
             SKRow("Zobrazit sekci Oblíbené") { SKToggle(isOn: $store.settings.showFavorites) }
             SKRow("Automatické zvýrazňování", help: "Pravidla v sekci Zvýrazňování.") {
                 SKToggle(isOn: $store.settings.highlightEnabled)
+            }
+            SKRow("Zvýrazňovat i v celoobrazovkových aplikacích",
+                  help: "watch, top, less, vim, mc… Celoobrazovkové aplikace často překreslují jen změněné znaky, takže zvýraznění může být neúplné nebo poblikávat; u watch -d se míchá s inverzí změn. Rozvržení obrazovky se nerozbije.") {
+                SKToggle(isOn: $highlightAltScreen)
             }
             SKRow("Měření latence", help: "Ping každých 10 s u připojené relace.") {
                 SKToggle(isOn: $store.settings.latencyEnabled)
