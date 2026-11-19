@@ -1094,6 +1094,12 @@ struct TabContextMenu: View {
         if tab.customTitle != nil { Button("Obnovit původní název") { tabs.resetTitle(tab.id) } }
         Divider()
         Button("Znovu připojit") { tabs.reconnect(tab.id) }
+        if tab.kind != .local, !tab.session.host.isEmpty {
+            Button("Kopírovat IP adresu (\(tab.session.host))") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(tab.session.host, forType: .string)
+            }
+        }
         if tab.kind != .serial {
             Button("Duplikovat") { tabs.duplicate(tab.id) }
         } else {

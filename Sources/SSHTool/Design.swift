@@ -106,6 +106,22 @@ struct ProdBadge: View { var body: some View { EnvBadge(tag: "prod") } }
 /// Hover stav bez @State (CLT SDK nemá SwiftUI makra).
 final class HoverModel: ObservableObject { @Published var on = false }
 
+/// Bublina s IP adresou nad kompaktní záložkou: objeví se po krátkém najetí, zmizí po odjetí.
+final class TabBubble: ObservableObject {
+    @Published var shown = false
+    private var work: DispatchWorkItem?
+
+    func hover(_ inside: Bool) {
+        work?.cancel()
+        guard inside else { if shown { shown = false }; return }
+        let w = DispatchWorkItem { [weak self] in self?.shown = true }
+        work = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: w)
+    }
+
+    func hide() { work?.cancel(); if shown { shown = false } }
+}
+
 /// Text se zvýrazněnou shodou s hledaným výrazem.
 func highlighted(_ text: String, _ query: String, color: SwiftUI.Color) -> Text {
     let q = query.trimmingCharacters(in: .whitespaces)
@@ -276,12 +292,8 @@ struct TabCard: View {
         if compact { compactBody } else { fullBody }
     }
 
-    /// Host / IP za názvem (lokální terminál nic; když se název shoduje s hostem, neopakovat).
-    private var hostLabel: String {
-        guard tab.kind != .local else { return "" }
-        let h = tab.session.host
-        return h.isEmpty || title.contains(h) ? "" : h
-    }
+    /// Host / IP pro bublinu (lokální terminál nic).
+    private var hostLabel: String { tab.kind == .local ? "" : tab.session.host }
 
     /// Jeden řádek: barva serveru · stav · název · prostředí · zavřít (host a typ jsou v nápovědě).
     private var compactBody: some View {
@@ -295,13 +307,6 @@ struct TabCard: View {
                 .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
                 .lineLimit(1)
                 .layoutPriority(1)
-            if !hostLabel.isEmpty {
-                Text(hostLabel)                                                  // IP / host malým písmem
-                    .font(.system(size: 9.5).monospacedDigit())
-                    .foregroundStyle(UI.textTertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
             EnvBadge(tag: tab.session.envTag)
             Spacer(minLength: 0)
             if tab.logging {
@@ -316,15 +321,35 @@ struct TabCard: View {
         }
         .padding(.horizontal, 7)
         .frame(height: 22)
-        .frame(minWidth: 84, maxWidth: 240)
+        .frame(minWidth: 84, maxWidth: 170)
         .background(RoundedRectangle(cornerRadius: 6).fill(selected ? UI.cardSelected : UI.card))
         .overlay(alignment: .bottom) {
             Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 6)
                 .opacity(focused ? 1 : 0)
         }
         .contentShape(Rectangle())
-        .onTapGesture(perform: select)
-        .help(tooltip)
+        .onTapGesture { bubble.hide(); select() }
+        // místo pomalé systémové nápovědy rychlá bublina s IP adresou (po ~0,35 s)
+        .onHover { bubble.hover($0) }
+        .popover(isPresented: Binding(get: { bubble.shown }, set: { if !$0 { bubble.hide() } }), arrowEdge: .bottom) {
+            bubbleContent
+        }
+    }
+
+    @StateObject private var bubble = TabBubble()
+
+    private var bubbleContent: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !hostLabel.isEmpty {
+                Text(hostLabel).font(.system(size: 13, weight: .semibold, design: .monospaced)).textSelection(.enabled)
+            }
+            Text(tab.session.name + (tab.session.user.isEmpty || tab.kind == .local ? "" : " · \(tab.session.user)@")
+                 + (tab.kind == .local || tab.kind == .serial ? "" : ":\(tab.session.port)"))
+                .font(.system(size: 11)).foregroundStyle(UI.textSecondary)
+            Text(tooltip.split(separator: "\n").dropFirst(2).joined(separator: " · "))
+                .font(.system(size: 10.5)).foregroundStyle(UI.textTertiary)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
     }
 
     private var fullBody: some View {

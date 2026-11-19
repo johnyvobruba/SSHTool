@@ -740,3 +740,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - Za názvem relace je malým písmem IP / host. Neopakuje se, když je už v názvu, a lokální terminál ho nemá.
   - Lišta záložek je nižší (34 px místo 54 px), karty mají výšku 22 px.
   - Menší je i tlačítko + a ikony v liště.
+
+## 0.40.2
+
+- **Kompaktní záložky – IP adresa v bublině**: IP už není přímo v kartě, takže karta zůstává úzká (nejvýš 170 px). Po najetí myší na záložku se asi po ⅓ s ukáže bublina s IP adresou (dá se označit), názvem, uživatelem a portem, typem a stavem relace. V kontextovém menu záložky přibyla položka *Kopírovat IP adresu*.
