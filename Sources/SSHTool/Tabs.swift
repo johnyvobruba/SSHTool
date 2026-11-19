@@ -858,6 +858,7 @@ struct EmptyTabsView: View {
 
 struct TabBar: View {
     @EnvironmentObject private var store: AppStore
+    @AppStorage("SSHTool.compactTabs") private var compactTabs = true
     @EnvironmentObject private var tabs: TabManager
     @EnvironmentObject private var serial: SerialMonitor
 
@@ -893,7 +894,7 @@ struct TabBar: View {
                     }
                     NewTabMenu()
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, compactTabs ? 4 : 8)
             }
 
             if tabs.tabs.count > 1 {

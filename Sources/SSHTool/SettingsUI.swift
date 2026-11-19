@@ -369,6 +369,7 @@ struct SettingsRootView: View {
 
 struct SettingsGeneralPane: View {
     @AppStorage("SSHTool.highlightAltScreen") private var highlightAltScreen = false
+    @AppStorage("SSHTool.compactTabs") private var compactTabs = true
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
@@ -379,6 +380,9 @@ struct SettingsGeneralPane: View {
                     .help("Kompaktní: název a IP na jednom řádku – IP vždy celá, dlouhý název se zkrátí „…“. Dvouřádkový: IP pod názvem.")
             }
             SKRow("Zobrazit sekci Oblíbené") { SKToggle(isOn: $store.settings.showFavorites) }
+            SKRow("Kompaktní záložky", help: "Jeden řádek a menší písmo – víc otevřených relací v liště. Host a typ relace jsou v nápovědě po najetí myší.") {
+                SKToggle(isOn: $compactTabs)
+            }
             SKRow("Automatické zvýrazňování", help: "Pravidla v sekci Zvýrazňování.") {
                 SKToggle(isOn: $store.settings.highlightEnabled)
             }

@@ -261,6 +261,8 @@ struct TabCard: View {
     let focused: Bool           // aktivní panel
     let select: () -> Void
     let close: () -> Void
+    /// Kompaktní karty: jeden řádek, menší písmo – víc záložek v liště (Nastavení → Obecné).
+    @AppStorage("SSHTool.compactTabs") private var compact = true
 
     private var tooltip: String {
         let mins = Int(Date().timeIntervalSince(tab.startedAt)) / 60
@@ -271,6 +273,46 @@ struct TabCard: View {
     }
 
     var body: some View {
+        if compact { compactBody } else { fullBody }
+    }
+
+    /// Jeden řádek: barva serveru · stav · název · prostředí · zavřít (host a typ jsou v nápovědě).
+    private var compactBody: some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(UI.sessionColor(tab.session.resolvedColorHex))
+                .frame(width: 3, height: 14)
+            StatusDot(color: tab.state.color, size: 5)
+            Text(title)
+                .font(.system(size: 11, weight: focused ? .semibold : .regular))
+                .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
+                .lineLimit(1)
+            EnvBadge(tag: tab.session.envTag)
+            Spacer(minLength: 0)
+            if tab.logging {
+                Image(systemName: "record.circle").font(.system(size: 8)).foregroundStyle(UI.error)
+            }
+            Button(action: close) {
+                Image(systemName: "xmark").font(.system(size: 7, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(UI.textTertiary)
+            .help("Zavřít záložku (⌘W)")
+        }
+        .padding(.horizontal, 7)
+        .frame(height: 24)
+        .frame(minWidth: 84, maxWidth: 170)
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? UI.cardSelected : UI.card))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 6)
+                .opacity(focused ? 1 : 0)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: select)
+        .help(tooltip)
+    }
+
+    private var fullBody: some View {
         HStack(spacing: 8) {
             RoundedRectangle(cornerRadius: 1.5)                                  // identita serveru/skupiny
                 .fill(UI.sessionColor(tab.session.resolvedColorHex))

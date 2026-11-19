@@ -729,3 +729,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - U `watch -d` se barvy pravidel míchají s inverzí změn.
   - Rozvržení obrazovky se nerozbije (barevné sekvence nemají šířku).
   - Změna platí okamžitě i v otevřených záložkách.
+
+## 0.40.0
+
+- **Kompaktní záložky**: karty relací mají jeden řádek a menší písmo (výška 24 px místo 38 px, šířka 84–170 px). V liště se tak vejde víc otevřených relací a lišta je nižší. Řádek obsahuje barvu serveru, stav, název, štítek prostředí a tlačítko zavřít; host a typ relace jsou v nápovědě po najetí myší. Původní dvouřádkové karty zapneš v Nastavení → Obecné → *Kompaktní záložky*.
