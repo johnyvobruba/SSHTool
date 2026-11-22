@@ -122,7 +122,7 @@ struct SettingsSnippetsPane: View {
                     SKMenuPicker(selection: binding(i, \.group),
                                  options: [("", "Všechny servery")] + store.groupNames.map { ($0, $0) }, width: 150)
                     Button { store.snippets.remove(at: i) } label: { Image(systemName: "trash") }
-                        .buttonStyle(.plain).foregroundStyle(UI.textTertiary).help("Smazat")
+                        .buttonStyle(.plain).foregroundStyle(UI.textTertiary).tip("Smazat")
                 }
                 .padding(.horizontal, SK.hPad).padding(.vertical, 6)
                 .overlay(alignment: .top) { if i > 0 { SKDivider() } }

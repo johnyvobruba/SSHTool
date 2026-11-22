@@ -189,14 +189,14 @@ struct SKColorChoice: View {
                 supportsOpacity: false)
                 .labelsHidden()
                 .opacity(hex.wrappedValue == nil ? 0.35 : 1)
-                .help("Klikni pro výběr barvy")
+                .tip("Klikni pro výběr barvy")
             if let h = hex.wrappedValue {
                 Text(h.uppercased()).font(.system(size: 11, design: .monospaced)).foregroundStyle(UI.textSecondary)
                 Button { hex.wrappedValue = nil } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 11))
                 }
                 .buttonStyle(.plain).foregroundStyle(UI.textTertiary)
-                .help(noneLabel)
+                .tip(noneLabel)
             } else {
                 Text(noneLabel).font(.system(size: 11)).foregroundStyle(UI.textTertiary)
             }
@@ -377,7 +377,7 @@ struct SettingsGeneralPane: View {
             SKRow("Režim levého panelu", help: "Kompaktní zobrazení názvu a IP adresy.", first: true) {
                 SKMenuPicker(selection: $store.settings.sidebarComfortable,
                              options: [(false, "Kompaktní (1 řádek)"), (true, "Dvouřádkový (název / IP)")])
-                    .help("Kompaktní: název a IP na jednom řádku – IP vždy celá, dlouhý název se zkrátí „…“. Dvouřádkový: IP pod názvem.")
+                    .tip("Kompaktní: název a IP na jednom řádku – IP vždy celá, dlouhý název se zkrátí „…“. Dvouřádkový: IP pod názvem.")
             }
             SKRow("Zobrazit sekci Oblíbené") { SKToggle(isOn: $store.settings.showFavorites) }
             SKRow("Kompaktní záložky", help: "Jeden řádek a menší písmo – víc otevřených relací v liště. Host a typ relace jsou v nápovědě po najetí myší.") {
@@ -392,7 +392,7 @@ struct SettingsGeneralPane: View {
             }
             SKRow("Měření latence", help: "Ping každých 10 s u připojené relace.") {
                 SKToggle(isOn: $store.settings.latencyEnabled)
-                    .help("ICMP ping k serveru – nevytváří SSH spojení ani záznamy v logu sshd. Pokud ICMP blokuje firewall, ukáže se „ICMP –“.")
+                    .tip("ICMP ping k serveru – nevytváří SSH spojení ani záznamy v logu sshd. Pokud ICMP blokuje firewall, ukáže se „ICMP –“.")
             }
             SKRow("Klient SSH", help: (SSHBinary.version(SSHBinary.path).map { "\(SSHBinary.path) · \($0)" } ?? SSHBinary.path)
                   + ". Vlastní klient (např. Homebrew OpenSSH) jen pokud systémový nezná potřebný algoritmus."
@@ -418,7 +418,7 @@ struct SettingsGeneralPane: View {
             }
             SKRow("Monitor serveru automaticky", help: "CPU, RAM a disk ve stavovém řádku po přihlášení.") {
                 SKToggle(isOn: $store.settings.monitorAuto)
-                    .help("Přes stejné SSH spojení (bez nového přihlášení) čte každých 5 s /proc a df. Jen Linux / Gaia s uživatelem s bash/sh; jinak „Monitor –“. Vypnuto: monitor zapneš kliknutím na „Monitor“ ve stavovém řádku.")
+                    .tip("Přes stejné SSH spojení (bez nového přihlášení) čte každých 5 s /proc a df. Jen Linux / Gaia s uživatelem s bash/sh; jinak „Monitor –“. Vypnuto: monitor zapneš kliknutím na „Monitor“ ve stavovém řádku.")
             }
             SKRow("Režim soustředění: stavový řádek", help: "⌥⌘F skryje levý panel a záložky.") {
                 SKToggle(isOn: $store.settings.focusShowStatus)
@@ -547,7 +547,7 @@ struct ThemeCard: View {
         .contentShape(Rectangle())
         .onHover { m.hover = $0 }
         .onTapGesture(perform: pick)
-        .help(selected ? "Aktivní profil" : "Kliknutím aktivovat")
+        .tip(selected ? "Aktivní profil" : "Kliknutím aktivovat")
     }
 }
 
@@ -711,7 +711,7 @@ struct SettingsTerminalPane: View {
                             .font(SK.bodyFont).monospacedDigit().frame(width: 48, alignment: .trailing)
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) { store.settings.lineSpacing = 1.15 }
-                            .help("Dvojklik = výchozí 1,15×")
+                            .tip("Dvojklik = výchozí 1,15×")
                     }
                 }
             }
@@ -1046,7 +1046,7 @@ struct UpdateSection: View {
             }
             SKRow("Kontrolovat automaticky", help: "Při spuštění (max. 4× denně) se zeptá GitHubu na novou verzi.") {
                 SKToggle(isOn: $store.settings.autoUpdateCheck)
-                    .help("Jen dotaz na api.github.com (veřejné repo, bez přihlášení). Instalace vždy až po potvrzení; balíček musí mít platný podpis Ed25519.")
+                    .tip("Jen dotaz na api.github.com (veřejné repo, bez přihlášení). Instalace vždy až po potvrzení; balíček musí mít platný podpis Ed25519.")
             }
             if let r = up.repo, let u = URL(string: "https://github.com/\(r)") {
                 SKRow("Projekt na GitHubu", help: "Popis, změny a stažení") {

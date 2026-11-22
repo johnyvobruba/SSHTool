@@ -776,7 +776,7 @@ struct TerminalPane: View {
             // hlavička 24 pt: ● název · IP  …  (aktivní panel = akcentová linka nahoře + světlejší pozadí)
             HStack(spacing: 6) {
                 RoundedRectangle(cornerRadius: 1).fill(UI.sessionColor(tab.session.resolvedColorHex)).frame(width: 3, height: 12)
-                StatusDot(color: tab.state.color, size: 6).help(tab.state.label)
+                StatusDot(color: tab.state.color, size: 6).tip(tab.state.label)
                 Text(tabs.displayTitle(tab))
                     .font(.system(size: 11, weight: focused ? .semibold : .regular)).lineLimit(1)
                 if tab.kind != .local {
@@ -803,7 +803,7 @@ struct TerminalPane: View {
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 .opacity(hover.on || focused ? 1 : 0.35)
-                .help("Akce panelu")
+                .tip("Akce panelu")
             }
             .foregroundStyle(focused ? UI.text : UI.textSecondary)
             .padding(.horizontal, 8)
@@ -875,7 +875,7 @@ struct TabBar: View {
         HStack(spacing: 6) {
             Button { tabs.toggleSidebar() } label: { chromeButton("sidebar.left") }
                 .buttonStyle(.plain)
-                .help(tabs.sidebar == .detailOnly ? "Zobrazit seznam serverů (⌃⌘S)" : "Skrýt seznam serverů (⌃⌘S)")
+                .tip(tabs.sidebar == .detailOnly ? "Zobrazit seznam serverů (⌃⌘S)" : "Skrýt seznam serverů (⌃⌘S)")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
@@ -909,7 +909,7 @@ struct TabBar: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .foregroundStyle(UI.textSecondary)
-                .help("Všechny otevřené relace (\(tabs.tabs.count))")
+                .tip("Všechny otevřené relace (\(tabs.tabs.count))")
             }
 
             Spacer(minLength: 0)
@@ -923,18 +923,18 @@ struct TabBar: View {
                         .foregroundStyle(SwiftUI.Color.white)
                 }
                 .buttonStyle(.plain)
-                .help("Broadcast vstupu je zapnutý – klikni pro vypnutí (⇧⌘I)")
+                .tip("Broadcast vstupu je zapnutý – klikni pro vypnutí (⇧⌘I)")
             }
 
             HStack(spacing: 0) {
                 Button { tabs.toggleSplit(.vertical) } label: {
                     chromeButton("rectangle.split.2x1", active: tabs.panes != nil && tabs.splitAxis == .vertical)
                 }
-                .help("Vedle sebe (⇧⌘D)")
+                .tip("Vedle sebe (⇧⌘D)")
                 Button { tabs.toggleSplit(.horizontal) } label: {
                     chromeButton("rectangle.split.1x2", active: tabs.panes != nil && tabs.splitAxis == .horizontal)
                 }
-                .help("Pod sebou (⌘D)")
+                .tip("Pod sebou (⌘D)")
             }
             .buttonStyle(.plain)
             .padding(2)
@@ -942,7 +942,7 @@ struct TabBar: View {
 
             Button { tabs.showPicker = true } label: { chromeButton("magnifyingglass") }
                 .buttonStyle(.plain)
-                .help("Hledat server / příkazová paleta (⌘K)")
+                .tip("Hledat server / příkazová paleta (⌘K)")
 
             Menu {
                 let list = tabs.snippetsForSelected(store.snippets)
@@ -964,21 +964,21 @@ struct TabBar: View {
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             .foregroundStyle(UI.textSecondary)
             .disabled(tabs.selected == nil)
-            .help("Snippety – uložené příkazy")
+            .tip("Snippety – uložené příkazy")
 
             Button { tabs.toggleFiles() } label: { chromeButton("folder", active: tabs.showFiles) }
                 .buttonStyle(.plain)
                 .disabled(tabs.selected == nil)
-                .help("Soubory serveru – procházení, nahrání ↑ a stažení ↓ (⇧⌘E)")
+                .tip("Soubory serveru – procházení, nahrání ↑ a stažení ↓ (⇧⌘E)")
 
             Button { tabs.showCapture = true } label: { chromeButton("waveform.path.ecg") }
                 .buttonStyle(.plain)
                 .disabled(tabs.selected == nil)
-                .help("Zachytávání paketů – tcpdump / fw monitor (⌥⌘P)")
+                .tip("Zachytávání paketů – tcpdump / fw monitor (⌥⌘P)")
 
             Button { tabs.toggleFocus() } label: { chromeButton("arrow.up.left.and.arrow.down.right") }
                 .buttonStyle(.plain)
-                .help("Režim soustředění – jen terminál (⌥⌘F)")
+                .tip("Režim soustředění – jen terminál (⌥⌘F)")
 
             Menu {
                 Button("Přidat panel vedle  ⇧⌘D") { tabs.split(.vertical) }
@@ -1074,7 +1074,7 @@ struct NewTabMenu: View {
         .fixedSize()
         .frame(width: compact ? 24 : 34, height: compact ? 22 : 38)
         .background(RoundedRectangle(cornerRadius: compact ? 6 : 8).fill(UI.card))
-        .help("Nová záložka")
+        .tip("Nová záložka")
     }
 }
 

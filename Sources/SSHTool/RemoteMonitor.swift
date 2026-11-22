@@ -257,9 +257,9 @@ struct MonitorLabel: View {
     var body: some View {
         switch monitor.state {
         case .waiting:
-            Label("Monitor…", systemImage: "chart.bar").help("Čekám na přihlášení relace")
+            Label("Monitor…", systemImage: "chart.bar").tip("Čekám na přihlášení relace")
         case .unavailable(let why):
-            Label("Monitor –", systemImage: "chart.bar").foregroundStyle(UI.textTertiary).help(why)
+            Label("Monitor –", systemImage: "chart.bar").foregroundStyle(UI.textTertiary).tip(why)
         case .stopped:
             EmptyView()
         case .running:
@@ -493,7 +493,7 @@ struct MonitorDetailView: View {
                 Spacer()
                 if d.loading { ProgressView().controlSize(.small) }
                 Button(action: refresh) { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.plain).help("Načíst znovu")
+                    .buttonStyle(.plain).tip("Načíst znovu")
             }
             if let e = d.error { Text(e).font(.caption).foregroundStyle(UI.error) }
             switch kind {

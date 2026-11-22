@@ -155,7 +155,7 @@ struct MultiSendBar: View {
             Label("Cíle: \(selectedCount) z \(candidates.count)", systemImage: "rectangle.stack")
         }
         .fixedSize()
-        .help(candidates.filter { m.selected.contains($0.id) }.map { tabs.displayTitle($0) }.joined(separator: ", "))
+        .tip(candidates.filter { m.selected.contains($0.id) }.map { tabs.displayTitle($0) }.joined(separator: ", "))
     }
 
     var body: some View {
@@ -165,17 +165,17 @@ struct MultiSendBar: View {
                 targetsMenu
                 if prodSelected {
                     Text("PROD").font(.system(size: 10, weight: .bold)).foregroundStyle(UI.error)
-                        .help("Mezi cíli je produkční zařízení")
+                        .tip("Mezi cíli je produkční zařízení")
                 }
                 Toggle("Enter", isOn: $m.appendEnter).toggleStyle(.checkbox)
-                    .help("Za každý řádek poslat Enter (spustit). Vypnuto = text se jen vloží.")
+                    .tip("Za každý řádek poslat Enter (spustit). Vypnuto = text se jen vloží.")
                 Toggle("Bez #", isOn: $m.skipComments).toggleStyle(.checkbox)
-                    .help("Vynechat řádky začínající #")
+                    .tip("Vynechat řádky začínající #")
                 Stepper(value: $m.delayMs, in: 0...10_000, step: 100) {
                     Text("\(m.delayMs) ms").font(.system(size: 11, design: .monospaced))
                 }
                 .fixedSize()
-                .help("Prodleva mezi řádky – u pomalých CLI (clish) zvyš na 1000 ms a víc")
+                .tip("Prodleva mezi řádky – u pomalých CLI (clish) zvyš na 1000 ms a víc")
                 if !store.snippets.isEmpty {
                     Menu("Snippet") {
                         ForEach(store.snippets) { s in
@@ -190,10 +190,10 @@ struct MultiSendBar: View {
                 Text(m.progress).font(.caption).foregroundStyle(UI.textSecondary).lineLimit(1)
                 Button { NSWorkspace.shared.open(MultiSendModel.auditURL) } label: { Image(systemName: "doc.text.magnifyingglass") }
                     .buttonStyle(.borderless)
-                    .help("Auditní log odeslaných příkazů (~/Library/Logs/SSHTool/multisend.log)")
+                    .tip("Auditní log odeslaných příkazů (~/Library/Logs/SSHTool/multisend.log)")
                     .disabled(!FileManager.default.fileExists(atPath: MultiSendModel.auditURL.path))
                 Button { tabs.showMultiSend = false } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.borderless).help("Zavřít panel  ⌥⌘I")
+                    .buttonStyle(.borderless).tip("Zavřít panel  ⌥⌘I")
             }
             .font(.system(size: 11.5))
             HStack(alignment: .bottom, spacing: 8) {

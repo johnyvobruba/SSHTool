@@ -95,7 +95,7 @@ struct EnvBadge: View {
                 .background(RoundedRectangle(cornerRadius: 3).fill(c.opacity(0.85)))
                 .foregroundStyle(SwiftUI.Color.white)
                 .fixedSize()
-                .help(h)
+                .tip(h)
         }
     }
 }
@@ -199,7 +199,7 @@ struct GroupHeaderRow: View {
         .contentShape(Rectangle())
         .onHover { hover.on = $0 }
         .onTapGesture(perform: toggle)
-        .help(collapsed ? "Rozbalit složku" : "Sbalit složku")
+        .tip(collapsed ? "Rozbalit složku" : "Sbalit složku")
     }
 }
 
@@ -220,7 +220,7 @@ struct SidebarSessionRow: View {
                 .foregroundStyle(session.favorite ? SwiftUI.Color.yellow : UI.textTertiary)
         }
         .buttonStyle(.plain)
-        .help(session.favorite ? "Odebrat z oblíbených" : "Přidat do oblíbených")
+        .tip(session.favorite ? "Odebrat z oblíbených" : "Přidat do oblíbených")
     }
 
     private var name: some View {
@@ -259,7 +259,7 @@ struct SidebarSessionRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(UI.textTertiary)
-                .help("Odpojit RDP relaci")
+                .tip("Odpojit RDP relaci")
             }
             dot
             star
@@ -271,7 +271,7 @@ struct SidebarSessionRow: View {
             RoundedRectangle(cornerRadius: 2).fill(UI.accent).frame(width: 3).padding(.vertical, 4)
                 .opacity(active ? 1 : 0)
         }
-        .help("\(session.name)\n\(session.user.isEmpty ? "" : session.user + "@")\(session.host):\(session.port) · \(session.group)\n\(state?.label ?? "Bez otevřené relace")"
+        .tip("\(session.name)\n\(session.user.isEmpty ? "" : session.user + "@")\(session.host):\(session.port) · \(session.group)\n\(state?.label ?? "Bez otevřené relace")"
               + (session.notes.isEmpty ? "" : "\n\n📝 " + session.notes))
     }
 }
@@ -406,7 +406,7 @@ struct TabCard: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(UI.textTertiary)
-            .help("Zavřít záložku (⌘W)")
+            .tip("Zavřít záložku (⌘W)")
         }
         .padding(.horizontal, 10)
         .frame(height: 38)
@@ -418,7 +418,7 @@ struct TabCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
-        .help(tooltip)
+        .tip(tooltip)
     }
 }
 
@@ -473,7 +473,7 @@ struct DisconnectBanner: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(UI.textTertiary)
-            .help("Skrýt (stav zůstává ve stavovém řádku)")
+            .tip("Skrýt (stav zůstává ve stavovém řádku)")
         }
         .padding(.horizontal, 12).padding(.vertical, 9)
         .frame(width: 300, alignment: .leading)
@@ -555,7 +555,7 @@ struct StatusBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(tab.running ? tab.state.label : "Kliknutím znovu připojit (⌘R)")
+                .tip(tab.running ? tab.state.label : "Kliknutím znovu připojit (⌘R)")
                 sep
                 Text(context).lineLimit(1)
                 EnvBadge(tag: tab.session.envTag)
@@ -572,7 +572,7 @@ struct StatusBar: View {
                         Label("\(tab.forwards.count)", systemImage: "arrow.left.arrow.right")
                     }
                     .buttonStyle(.plain)
-                    .help("Tunely:\n" + tab.forwards.map { $0.label + ($0.note.isEmpty ? "" : "  – " + $0.note) }.joined(separator: "\n"))
+                    .tip("Tunely:\n" + tab.forwards.map { $0.label + ($0.note.isEmpty ? "" : "  – " + $0.note) }.joined(separator: "\n"))
                 }
                 if let live = tabs.liveCapture { sep; LiveCaptureBadge(capture: live) }
                 if tab.running, let mon = tab.monitor {
@@ -583,7 +583,7 @@ struct StatusBar: View {
                     sep
                     Button { tab.startMonitor() } label: { Label("Monitor", systemImage: "chart.bar") }
                         .buttonStyle(.plain)
-                        .help("Zobrazit CPU, RAM a disk serveru (Linux / Gaia s bash). Čte /proc přes stejné SSH spojení, nic nemění.")
+                        .tip("Zobrazit CPU, RAM a disk serveru (Linux / Gaia s bash). Čte /proc přes stejné SSH spojení, nic nemění.")
                 }
                 if tabs.broadcast {
                     sep
@@ -593,7 +593,7 @@ struct StatusBar: View {
                 Spacer()
                 if tabs.focusMode {
                     Button { tabs.toggleFocus() } label: { Label("Soustředění", systemImage: "arrow.down.right.and.arrow.up.left") }
-                        .buttonStyle(.plain).foregroundStyle(UI.accent).help("Ukončit režim soustředění (⌥⌘F)")
+                        .buttonStyle(.plain).foregroundStyle(UI.accent).tip("Ukončit režim soustředění (⌥⌘F)")
                     sep
                 }
                 Text("UTF-8")
@@ -623,10 +623,10 @@ struct LatencyLabel: View {
         if let ms = probe.ms {
             Text("\(max(1, Int(ms.rounded()))) ms")
                 .foregroundStyle(ms > 150 ? UI.connecting : UI.textStatus)
-                .help("Latence ICMP (ping) k serveru")
+                .tip("Latence ICMP (ping) k serveru")
         } else {
             Text(probe.failed ? "ICMP –" : "… ms")
-                .help(probe.failed ? "Server neodpovídá na ping (ICMP může být blokované – SSH tím není ovlivněno)" : "Měřím…")
+                .tip(probe.failed ? "Server neodpovídá na ping (ICMP může být blokované – SSH tím není ovlivněno)" : "Měřím…")
         }
     }
 }
@@ -636,13 +636,13 @@ struct SettingsButton: View {
         if #available(macOS 14.0, *) {
             SettingsLink { Image(systemName: "gearshape") }
                 .buttonStyle(.plain)
-                .help("Nastavení (⌘,)")
+                .tip("Nastavení (⌘,)")
         } else {
             Button {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             } label: { Image(systemName: "gearshape") }
             .buttonStyle(.plain)
-            .help("Nastavení (⌘,)")
+            .tip("Nastavení (⌘,)")
         }
     }
 }

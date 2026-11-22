@@ -142,13 +142,13 @@ private struct DetachedTabContent: View {
                 EnvBadge(tag: tab.session.envTag)
                 Spacer()
                 Button { tabs.rename(tab.id) } label: { Image(systemName: "pencil") }
-                    .buttonStyle(.plain).help("Přejmenovat záložku")
+                    .buttonStyle(.plain).tip("Přejmenovat záložku")
                 Button { tabs.reconnect(tab.id) } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.plain).help("Znovu připojit (⇧⌘R)")
+                    .buttonStyle(.plain).tip("Znovu připojit (⇧⌘R)")
                 Button { tabs.attachToMain(tab.id) } label: {
                     Label("Do hlavního okna", systemImage: "rectangle.stack").font(.system(size: 11))
                 }
-                .buttonStyle(.plain).help("Vrátit záložku do lišty hlavního okna (⌥⌘N)")
+                .buttonStyle(.plain).tip("Vrátit záložku do lišty hlavního okna (⌥⌘N)")
             }
             .foregroundStyle(UI.textSecondary)
             .padding(.horizontal, 10).frame(height: 30)

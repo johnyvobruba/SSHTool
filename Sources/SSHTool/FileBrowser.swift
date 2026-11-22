@@ -614,7 +614,7 @@ struct FileBrowserPanel: View {
     private func tool(_ icon: String, _ help: String, disabled: Bool = false, _ action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 12)).frame(width: 24, height: 22) }
             .buttonStyle(.plain).foregroundStyle(disabled ? UI.textTertiary : UI.text)
-            .disabled(disabled).help(help)
+            .disabled(disabled).tip(help)
     }
 
     var body: some View {
@@ -627,7 +627,7 @@ struct FileBrowserPanel: View {
                 Spacer()
                 if !embedded {
                     Button { tabs.showFiles = false } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
-                        .buttonStyle(.plain).foregroundStyle(UI.textTertiary).help("Zavřít panel (⇧⌘E)")
+                        .buttonStyle(.plain).foregroundStyle(UI.textTertiary).tip("Zavřít panel (⇧⌘E)")
                 }
             }
             .padding(.horizontal, 10).frame(height: 30).background(UI.chrome)
@@ -649,7 +649,7 @@ struct FileBrowserPanel: View {
                 tool("trash", "Smazat vybrané", disabled: selected.isEmpty) { b.delete(selected) }
                 Spacer()
                 Toggle(isOn: $b.showHidden) { Image(systemName: "eye") }
-                    .toggleStyle(.button).controlSize(.small).help("Zobrazit skryté soubory (.*)")
+                    .toggleStyle(.button).controlSize(.small).tip("Zobrazit skryté soubory (.*)")
             }
             .padding(.horizontal, 6).frame(height: 30)
 
@@ -687,7 +687,7 @@ struct FileBrowserPanel: View {
                             .foregroundStyle(e.isDir ? UI.accent : UI.textSecondary).font(.system(size: 11))
                         Text(e.name).lineLimit(1).truncationMode(.middle)
                     }
-                    .help("\(e.perms)  \(e.owner)\n\(e.name)")
+                    .tip("\(e.perms)  \(e.owner)\n\(e.name)")
                 }
                 TableColumn("Velikost") { e in Text(sizeText(e)).foregroundStyle(UI.textSecondary).monospacedDigit() }
                     .width(min: 50, ideal: 64, max: 90)
@@ -752,7 +752,7 @@ struct FileBrowserPanel: View {
                             Spacer(minLength: 4)
                             Button("Otevřít") { b.reopen(e.id) }.buttonStyle(.plain).foregroundStyle(UI.accent)
                             Button("Ukončit") { b.stopEditing(e.id) }.buttonStyle(.plain).foregroundStyle(UI.textSecondary)
-                                .help("Přestat sledovat a smazat pracovní kopii na Macu")
+                                .tip("Přestat sledovat a smazat pracovní kopii na Macu")
                         }
                         .font(.system(size: 11))
                     }
@@ -784,7 +784,7 @@ struct FileBrowserPanel: View {
                                 }
                                 if let u = t.reveal {
                                     Button { NSWorkspace.shared.activateFileViewerSelecting([u]) } label: { Image(systemName: "magnifyingglass") }
-                                        .buttonStyle(.plain).foregroundStyle(UI.accent).help("Zobrazit ve Finderu")
+                                        .buttonStyle(.plain).foregroundStyle(UI.accent).tip("Zobrazit ve Finderu")
                                 }
                             }
                             if t.state == .running {
@@ -795,7 +795,7 @@ struct FileBrowserPanel: View {
                             }
                         }
                         .font(.system(size: 11))
-                        .help(t.detail.isEmpty ? t.progressText : t.detail)
+                        .tip(t.detail.isEmpty ? t.progressText : t.detail)
                     }
                 }
                 .padding(8)
@@ -923,7 +923,7 @@ struct LocalFilePane: View {
     private func tool(_ icon: String, _ help: String, disabled: Bool = false, _ action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 12)).frame(width: 24, height: 22) }
             .buttonStyle(.plain).foregroundStyle(disabled ? UI.textTertiary : UI.text)
-            .disabled(disabled).help(help)
+            .disabled(disabled).tip(help)
     }
 
     var body: some View {
@@ -945,7 +945,7 @@ struct LocalFilePane: View {
                 tool("folder", "Zobrazit ve Finderu") { NSWorkspace.shared.activateFileViewerSelecting([l.dir]) }
                 Spacer()
                 Toggle(isOn: $l.showHidden) { Image(systemName: "eye") }
-                    .toggleStyle(.button).controlSize(.small).help("Zobrazit skryté soubory")
+                    .toggleStyle(.button).controlSize(.small).tip("Zobrazit skryté soubory")
             }
             .padding(.horizontal, 6).frame(height: 30)
             TextField("~/cesta", text: $l.pathField).textFieldStyle(.plain)
@@ -1003,7 +1003,7 @@ struct DualFileBrowser: View {
                 Spacer()
                 Toggle(isOn: $dual) { Label("Dva panely", systemImage: "rectangle.split.2x1") }
                     .toggleStyle(.button).controlSize(.small)
-                    .help("Vlevo soubory Macu, vpravo server – přenosy tlačítky nebo přetažením")
+                    .tip("Vlevo soubory Macu, vpravo server – přenosy tlačítky nebo přetažením")
             }
             .padding(.horizontal, 8).padding(.vertical, 3).background(UI.chrome)
             if dual {

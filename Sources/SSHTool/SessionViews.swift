@@ -254,7 +254,7 @@ struct SessionListView: View {
                 .frame(width: 30, height: 30)
                 .background(RoundedRectangle(cornerRadius: 8).fill(UI.card))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(UI.border, lineWidth: 1))
-                .help("Nový server (klik) · podrž pro další volby")
+                .tip("Nový server (klik) · podrž pro další volby")
             }
             .padding(.horizontal, 10)
             .padding(.top, 34)                 // místo pro semafor okna (titulková lišta je skrytá)
@@ -437,7 +437,7 @@ struct SessionRow: View {
             if session.usesStoredPassword {
                 Image(systemName: session.requireUserAuth ? "touchid" : "key.fill")
                     .font(.caption2).foregroundStyle(.tertiary)
-                    .help(session.requireUserAuth ? "Uložené heslo, chráněné Touch ID / heslem Macu" : "Uložené heslo bez ochrany")
+                    .tip(session.requireUserAuth ? "Uložené heslo, chráněné Touch ID / heslem Macu" : "Uložené heslo bez ochrany")
             }
         }
     }
@@ -502,7 +502,7 @@ struct SessionEditor: View {
             HStack(spacing: 10) {
                 if let p = problems.first {
                     Label(p, systemImage: "exclamationmark.circle").font(.system(size: 11.5))
-                        .foregroundStyle(UI.error).lineLimit(1).help(problems.joined(separator: "\n"))
+                        .foregroundStyle(UI.error).lineLimit(1).tip(problems.joined(separator: "\n"))
                 }
                 Spacer()
                 Button("Zrušit") { dismiss() }.keyboardShortcut(.cancelAction).buttonStyle(SKButton())
@@ -680,10 +680,10 @@ struct SessionEditor: View {
             Section("Tunelování portů") {
                 ForEach($m.session.forwards) { $f in
                     HStack(alignment: .top) {
-                        Toggle("", isOn: $f.enabled).labelsHidden().help("Tunel zapnutý")
+                        Toggle("", isOn: $f.enabled).labelsHidden().tip("Tunel zapnutý")
                         ForwardEditorRow(f: $f)
                         Button { m.session.forwards.removeAll { $0.id == f.id } } label: { Image(systemName: "minus.circle") }
-                            .buttonStyle(.borderless).help("Odebrat tunel")
+                            .buttonStyle(.borderless).tip("Odebrat tunel")
                     }
                     .padding(.vertical, 4)
                 }
@@ -848,7 +848,7 @@ struct SessionEditor: View {
                     }
                     Spacer()
                     Button { m.session.rdpFolders.removeAll { $0 == path } } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless).help("Přestat sdílet")
+                        .buttonStyle(.borderless).tip("Přestat sdílet")
                 }
             }
             Button("Přidat složku…") { addSharedFolders() }
@@ -915,7 +915,7 @@ struct SessionEditor: View {
                 }
                 if let v = Bundle.main.url(forResource: "FreeRDP-VERSIONS", withExtension: "txt") {
                     Button("Verze přibalených knihoven…") { NSWorkspace.shared.open(v) }
-                        .help("Verze FreeRDP, OpenSSL, FFmpeg, SDL… – pro kontrolu známých zranitelností (CVE)")
+                        .tip("Verze FreeRDP, OpenSSL, FFmpeg, SDL… – pro kontrolu známých zranitelností (CVE)")
                 }
                 if let bin = FreeRDP.binary {
                     Label("FreeRDP: \(bin)", systemImage: "checkmark.circle").font(.caption).foregroundStyle(Color.green)
@@ -959,7 +959,7 @@ struct SessionEditor: View {
                 Button("Zkopírovat veřejné klíče z agenta") {
                     SSHKeys.copyAgentPublicKeys(socket: m.session.resolvedAgentSocket)
                 }
-                .help("ssh-add -L – pro vložení do authorized_keys na zařízení")
+                .tip("ssh-add -L – pro vložení do authorized_keys na zařízení")
             }
         case .key:
             HStack {
@@ -1020,7 +1020,7 @@ struct SessionEditor: View {
                 .padding(.horizontal, 7).frame(height: 22)
                 .background(Capsule().stroke(m.session.colorHex.isEmpty ? UI.accent : UI.border, lineWidth: m.session.colorHex.isEmpty ? 2 : 1))
             }
-            .buttonStyle(.plain).help("Automaticky podle složky (výchozí)")
+            .buttonStyle(.plain).tip("Automaticky podle složky (výchozí)")
             ForEach(Self.palette, id: \.self) { h in
                 let sel = m.session.colorHex.uppercased() == h.uppercased()
                 Circle().fill(Color(hex: h) ?? .gray).frame(width: 16, height: 16)
@@ -1032,9 +1032,9 @@ struct SessionEditor: View {
                 Image(systemName: "circle.slash").font(.system(size: 15))
                     .foregroundStyle(m.session.colorHex == "none" ? UI.accent : UI.textTertiary)
             }
-            .buttonStyle(.plain).help("Bez barvy")
+            .buttonStyle(.plain).tip("Bez barvy")
             ColorPicker("", selection: colorBinding, supportsOpacity: false).labelsHidden()
-                .help("Vlastní barva")
+                .tip("Vlastní barva")
         }
     }
 

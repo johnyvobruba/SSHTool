@@ -202,7 +202,7 @@ struct SerialPortsSection: View {
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { tabs.openSerial(p, baud: baud) }
                     .contextMenu { SerialPortMenuItems(port: p) }
-                    .help("Dvojklik = připojit, pravé tlačítko = rychlost")
+                    .tip("Dvojklik = připojit, pravé tlačítko = rychlost")
                 }
             }
         }

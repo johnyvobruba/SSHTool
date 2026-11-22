@@ -223,7 +223,7 @@ struct RulesEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(on ? UI.text : UI.textSecondary)
-        .help(on ? "Vypnout skupinu" : "Zapnout skupinu")
+        .tip(on ? "Vypnout skupinu" : "Zapnout skupinu")
     }
 
     private func binding(_ id: UUID) -> Binding<HighlightRule> {
@@ -304,10 +304,10 @@ private struct RuleItem: View {
                 .draggable(r.id.uuidString) {
                     Text(r.pattern.isEmpty ? "pravidlo" : r.pattern).font(SK.monoFont).padding(6)
                 }
-                .help("Táhni pro změnu pořadí")
+                .tip("Táhni pro změnu pořadí")
             Text("#\(priority)").font(.system(size: 10.5, design: .monospaced)).foregroundStyle(UI.textTertiary)
                 .frame(width: 26, alignment: .leading)
-            SKToggle(isOn: rule.enabled).help(r.enabled ? "Aktivní – klikni pro vypnutí" : "Neaktivní")
+            SKToggle(isOn: rule.enabled).tip(r.enabled ? "Aktivní – klikni pro vypnutí" : "Neaktivní")
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(r.pattern.isEmpty ? "(prázdný výraz)" : r.pattern)
@@ -322,9 +322,9 @@ private struct RuleItem: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             SKTag(text: r.isRegex ? "Regex" : "Text", color: r.isRegex ? UI.accent : nil)
-                .help(r.isRegex ? "Regex – regulární výraz" : "Text – doslovná shoda")
-            if r.caseSensitive { SKTag(text: "Aa").help("Aa – rozlišuje velikost písmen") }
-            if r.bold { SKTag(text: "B").help("B – tučné písmo") }
+                .tip(r.isRegex ? "Regex – regulární výraz" : "Text – doslovná shoda")
+            if r.caseSensitive { SKTag(text: "Aa").tip("Aa – rozlišuje velikost písmen") }
+            if r.bold { SKTag(text: "B").tip("B – tučné písmo") }
             colorDot(r.foreground, label: "Text")
             colorDot(r.background, label: "Pozadí")
 
@@ -333,7 +333,7 @@ private struct RuleItem: View {
                 .rotationEffect(.degrees(open ? 90 : 0))
             Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 11)) }
                 .buttonStyle(.plain).foregroundStyle(UI.textTertiary)
-                .help("Smazat pravidlo")
+                .tip("Smazat pravidlo")
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 52)
@@ -353,7 +353,7 @@ private struct RuleItem: View {
                     .frame(width: 14, height: 14)
             }
         }
-        .help("\(label): \(hex ?? "bez barvy")")
+        .tip("\(label): \(hex ?? "bez barvy")")
     }
 
     /// Skutečný barevný náhled shody.
@@ -385,7 +385,7 @@ private struct RuleItem: View {
         } else if let c = RuleAnalysis.conflict(for: r, in: all), let n = all.firstIndex(where: { $0.id == c.id }) {
             Label("Konflikt s #\(n + 1) „\(c.pattern)“", systemImage: "exclamationmark.triangle")
                 .font(.system(size: 10.5)).foregroundStyle(UI.connecting).lineLimit(1)
-                .help("Pravidlo #\(n + 1) má vyšší prioritu a obarví část stejného textu dřív.")
+                .tip("Pravidlo #\(n + 1) má vyšší prioritu a obarví část stejného textu dřív.")
         }
     }
 

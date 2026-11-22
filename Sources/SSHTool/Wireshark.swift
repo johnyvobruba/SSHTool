@@ -207,6 +207,6 @@ struct LiveCaptureBadge: View {
                     .buttonStyle(.plain).foregroundStyle(UI.textTertiary)
             }
         }
-        .help("Živý odchyt do Wiresharku: \(capture.title)")
+        .tip("Živý odchyt do Wiresharku: \(capture.title)")
     }
 }

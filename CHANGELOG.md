@@ -751,3 +751,7 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
   - **Křížek pro zavření reaguje spolehlivě:** má větší plochu pro kliknutí. Nad křížkem se nezobrazuje bublina s IP, takže první klik už nespotřebuje její zavření.
   - **Karta je jen tak široká, jak je potřeba:** zmizela mezera mezi názvem a křížkem a dlouhý název se zkrátí „…“.
   - **Text bubliny:** „uživatel … · port …“ a „SSH · připojeno X min Y s“, bez zdvojeného stavu.
+
+## 0.40.4
+
+- **Popisky ikon:** po najetí myší na ikonu se po chvilce ukáže bublina s popisem (dřív se systémový popisek často neukázal).
