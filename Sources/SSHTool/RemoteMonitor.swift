@@ -111,7 +111,7 @@ final class RemoteMonitor: ObservableObject, @unchecked Sendable {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: SSHBinary.path)
         p.arguments = ["-S", controlPath, "-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T",
-                       destination, Self.script]
+                       "--", destination, Self.script]
         var env = ProcessInfo.sanitizedEnvironment
         env.removeValue(forKey: "SSH_ASKPASS")
         p.environment = env

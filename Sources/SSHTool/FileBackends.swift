@@ -128,7 +128,7 @@ enum FileBackend {
         }
         func esc(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
         let config = c.user.isEmpty ? "" : "user = \"\(esc(c.user)):\(esc(password ?? ""))\"\n"
-        let common = ["-s", "-S", "-K", "-", "--connect-timeout", "15"]
+        let common = ["-s", "-S", "-K", "-", "--connect-timeout", "15", "--tlsv1.2"]   // FTPS: minimálně TLS 1.2
             + (c.tls == "explicit" ? ["--ssl-reqd"] : []) + (c.insecure ? ["-k"] : [])
         func curl(_ args: [String], track: Bool = false) -> (Int32, String, String) {
             proc("/usr/bin/curl", common + args, stdin: config, pid: track ? pid : nil)

@@ -755,3 +755,11 @@ V průvodci zachytáváním (⌥⌘P) sekce **Wireshark (lokálně v Macu)**:
 ## 0.40.4
 
 - **Popisky ikon:** po najetí myší na ikonu se po chvilce ukáže bublina s popisem (dřív se systémový popisek často neukázal).
+
+## 0.40.5
+
+Bezpečnostní úpravy podle revize Project CodeGuard:
+- **Starší šifry:** u serverů s volbou „Starší zařízení“ ukazuje stavový řádek štítek „starší šifry“ s popisem, co je zapnuto (ssh-rsa/SHA-1, DH group1/14-sha1, CBC vč. 3DES, hmac-sha1). Moderní algoritmy mají dál přednost.
+- **FTPS** vyžaduje minimálně TLS 1.2.
+- Monitor serveru volá ssh s oddělovačem `--` před cílem (obrana proti podstrčeným přepínačům).
+- **Release:** GitHub Actions připnuté na commit SHA (+ Dependabot), oprávnění jen na úrovni jobu, ke každému vydání **SBOM** (verze FreeRDP a všech přibalených knihoven Homebrew vč. SHA-256 bottlů, balíčky SwiftPM) a podepsaná **provenance buildu** (Sigstore – ověření `gh attestation verify SSHTool-<verze>.zip -R johnyvobruba/SSHTool`).

@@ -559,6 +559,11 @@ struct StatusBar: View {
                 sep
                 Text(context).lineLimit(1)
                 EnvBadge(tag: tab.session.envTag)
+                if tab.session.legacyAlgorithms, tab.kind == .ssh || tab.kind == .sftp {
+                    Label("starší šifry", systemImage: "lock.open")
+                        .font(.system(size: 10.5)).foregroundStyle(UI.connecting)
+                        .tip("Pro tento server jsou zapnuté i starší algoritmy (ssh-rsa/SHA-1, DH group1/14-sha1, CBC vč. 3DES, hmac-sha1) kvůli kompatibilitě se starým zařízením. Moderní mají přednost – starší se použijí, jen když server jiné neumí. Vypnutí: Upravit server → Starší zařízení.")
+                }
                 if tab.kind == .ssh || tab.kind == .sftp || tab.kind == .ftp {
                     sep
                     Text(tab.session.host).font(.system(size: 11, design: .monospaced))

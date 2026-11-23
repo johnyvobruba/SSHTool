@@ -1,0 +1,7 @@
+# Upozorní na nové verze GitHub Actions (připnuté na SHA) – PR s aktualizací SHA.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -654,7 +654,7 @@ struct SessionEditor: View {
                         }
                         Toggle("Starší zařízení – povolit legacy algoritmy", isOn: $m.session.legacyAlgorithms)
                         Text(m.session.legacyAlgorithms
-                             ? "Přidá k výchozím: ssh-rsa (SHA-1), diffie-hellman-group14/1-sha1, CBC šifry, hmac-sha1 – jen ty, které klient ssh ještě zná. Slabší šifrování, používej jen pro staré Cisco IOS/ASA, F5, Gaia apod. Algoritmus, který OpenSSH úplně odstranil (DSA), vrátí jen jiný klient ssh (Nastavení → Obecné → Klient SSH)."
+                             ? "ℹ︎ Zapínají se i starší šifry: ssh-rsa (SHA-1), diffie-hellman-group14/1-sha1, CBC šifry (vč. 3DES), hmac-sha1 – jen ty, které klient ssh ještě zná, a až za moderními (pokud je server umí, použijí se moderní). Pro staré Cisco IOS/ASA, F5, Gaia apod. Ve stavovém řádku se u relace ukáže štítek „starší šifry“. DSA vrátí jen jiný klient ssh (Nastavení → Obecné → Klient SSH)."
                              : "Pro zařízení, která po aktualizaci macOS hlásí „no matching key exchange / host key type / cipher“.")
                             .font(.caption).foregroundStyle(m.session.legacyAlgorithms ? Color.orange : .secondary)
                         Picker("Přenos souborů", selection: $m.session.fileTransfer) {
