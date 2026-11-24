@@ -654,7 +654,6 @@ struct MainView: View {
                     .background(WindowDragHandle(onDoubleClick: { tabs.toggleFocus() }))
                 } else {
                     TabBar()
-                    Rectangle().fill(UI.border).frame(height: 1)
                 }
                 HStack(spacing: 0) {
                     Group {
@@ -673,24 +672,26 @@ struct MainView: View {
                             .id(t.id)                    // každá záložka má vlastní prohlížeč
                     }
                 }
+                // terminál jako zaoblená karta na přechodu okna (v režimu soustředění přes celé okno)
+                .background(UI.main)
+                .modifier(TerminalCard(on: !tabs.focusMode))
                 if tabs.showMultiSend {
-                    Rectangle().fill(UI.border).frame(height: 1)
                     MultiSendBar(m: tabs.multiSend)
+                        .glassCard(radius: 10, fill: Modern.glassStrong)
+                        .padding(.horizontal, 8).padding(.top, 6)
                 }
                 if tabs.focusMode && !store.settings.focusShowStatus {
                     EmptyView()
                 } else if let tab = tabs.selected {
-                    Rectangle().fill(UI.border).frame(height: 1)
                     StatusBar(tab: tab)
                 } else {
                     HStack { Spacer(); SettingsButton() }
                         .font(.system(size: 11)).foregroundStyle(UI.textSecondary)
-                        .padding(.horizontal, 12).frame(height: 28).background(UI.statusBar)
+                        .padding(.horizontal, 12).frame(height: 28)
                 }
             }
-            .background(UI.app)
         }
-        .background(UI.sidebar)
+        .background(ModernBackground())
         .ignoresSafeArea(.container, edges: .top)   // obsah až pod průhlednou titulkovou lištu
         .background(WindowConfigurator(title: tabs.selected?.title ?? "SSHTool"))
         .sheet(isPresented: $tabs.showPicker) {
@@ -1021,7 +1022,6 @@ struct TabBar: View {
         // se skrytým levým panelem je vlevo nahoře semafor okna
         .padding(.leading, tabs.sidebar == .detailOnly ? 70 : 0)
         .frame(height: compactTabs ? 34 : 54)
-        .background(UI.chrome)
         .background(WindowDragHandle(onDoubleClick: { tabs.showPicker = true }))   // dvojklik do prázdna = nová záložka
         .sheet(isPresented: $tabs.showQuickConnect) {
             QuickConnectSheet().environmentObject(store).environmentObject(tabs)
@@ -1393,5 +1393,22 @@ struct WindowConfigurator: NSViewRepresentable {
     func updateNSView(_ v: V, context: Context) {
         v.title = title
         DispatchQueue.main.async { v.configure() }
+    }
+}
+
+
+/// Terminál jako zaoblená karta s odsazením (moderní vzhled); vypnuto = přes celé okno.
+struct TerminalCard: ViewModifier {
+    let on: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if on {
+            content
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Modern.glassStroke, lineWidth: 1))
+                .shadow(color: .black.opacity(0.22), radius: 8, y: 2)
+                .padding(.horizontal, 8).padding(.top, 2).padding(.bottom, 4)
+        } else {
+            content
+        }
     }
 }

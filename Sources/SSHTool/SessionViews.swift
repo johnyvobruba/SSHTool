@@ -277,7 +277,7 @@ struct SessionListView: View {
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
         }
-        .background(UI.sidebar)
+        .background(Modern.glass)
         .sheet(item: $ui.editing) { s in
             SessionEditor(session: s, groups: store.groupNames, groupColors: store.groupColors,
                           existing: store.sessions) { store.upsert($0, password: $1) }

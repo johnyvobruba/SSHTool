@@ -763,3 +763,10 @@ Bezpečnostní úpravy podle revize Project CodeGuard:
 - **FTPS** vyžaduje minimálně TLS 1.2.
 - Monitor serveru volá ssh s oddělovačem `--` před cílem (obrana proti podstrčeným přepínačům).
 - **Release:** GitHub Actions připnuté na commit SHA (+ Dependabot), oprávnění jen na úrovni jobu, ke každému vydání **SBOM** (verze FreeRDP a všech přibalených knihoven Homebrew vč. SHA-256 bottlů, balíčky SwiftPM) a podepsaná **provenance buildu** (Sigstore – ověření `gh attestation verify SSHTool-<verze>.zip -R johnyvobruba/SSHTool`).
+
+## 0.41.0
+
+- **Modernější vzhled** (ve stylu okna Úklid z FileTool), barvy dál podle zvoleného barevného profilu:
+  - okno s jemným přechodem z barev profilu a září v rohu, průhledná lišta záložek, levý panel a stavový řádek;
+  - terminál jako zaoblená karta se stínem (v režimu soustředění ⌥⌘F přes celé okno);
+  - hromadné odesílání příkazů na skleněné kartě.

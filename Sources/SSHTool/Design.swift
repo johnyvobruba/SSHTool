@@ -617,7 +617,6 @@ struct StatusBar: View {
             .foregroundStyle(UI.textStatus)
             .padding(.horizontal, 12)
             .frame(height: 28)
-            .background(UI.statusBar)
         }
     }
 }
