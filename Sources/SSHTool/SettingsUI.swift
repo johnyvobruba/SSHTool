@@ -432,6 +432,7 @@ struct SettingsGeneralPane: View {
 struct SettingsAppearancePane: View {
     @EnvironmentObject private var store: AppStore
     @AppStorage("SSHTool.themedIcon") private var themedIcon = true
+    @AppStorage("uiStyle") private var uiStyle = "vivid"
 
     var body: some View {
         SKSection("Barevný profil aplikace",
@@ -441,6 +442,16 @@ struct SettingsAppearancePane: View {
                 ForEach(Theme.all) { t in
                     ThemeCard(theme: t, selected: store.settings.themeID == t.id) { pick(t) }
                 }
+            }
+        }
+        SKSection("Styl rozhraní") {
+            SKRow("Styl", help: "Výrazný: sytější přechody, stíny a barevné ikony. Jemný: klidnější varianta stejného profilu. Velikosti tlačítek se nemění.", first: true) {
+                Picker("", selection: $uiStyle) {
+                    Text("Výrazný").tag("vivid")
+                    Text("Jemný").tag("subtle")
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 280)
+                .onChange(of: uiStyle) { _ in store.applyTheme() }
             }
         }
         SKSection("Barevný profil terminálu", subtitle: "Např. tmavé rozhraní a jiná paleta samotného terminálu.") {

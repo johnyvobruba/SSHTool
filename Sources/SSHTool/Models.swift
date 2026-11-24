@@ -537,7 +537,7 @@ final class AppStore: ObservableObject {
 
     func applyTheme() {
         let r = ThemeStore.resolve(settings)
-        let key = r.ui.id + "/" + r.terminal.id
+        let key = r.ui.id + "/" + r.terminal.id + "/" + Brand.styleKey
         guard key != themeKey else { return }
         ThemeStore.ui = r.ui
         ThemeStore.terminal = r.terminal

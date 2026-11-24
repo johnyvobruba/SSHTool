@@ -691,7 +691,7 @@ struct MainView: View {
                 }
             }
         }
-        .background(ModernBackground())
+        .background(ModernBackground(header: tabs.focusMode ? 0 : ((UserDefaults.standard.object(forKey: "SSHTool.compactTabs") as? Bool ?? true) ? 34 : 54)))
         .ignoresSafeArea(.container, edges: .top)   // obsah až pod průhlednou titulkovou lištu
         .background(WindowConfigurator(title: tabs.selected?.title ?? "SSHTool"))
         .sheet(isPresented: $tabs.showPicker) {

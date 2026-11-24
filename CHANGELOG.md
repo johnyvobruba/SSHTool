@@ -770,3 +770,9 @@ Bezpečnostní úpravy podle revize Project CodeGuard:
   - okno s jemným přechodem z barev profilu a září v rohu, průhledná lišta záložek, levý panel a stavový řádek;
   - terminál jako zaoblená karta se stínem (v režimu soustředění ⌥⌘F přes celé okno);
   - hromadné odesílání příkazů na skleněné kartě.
+
+## 0.42.0
+
+- **Barevný profil přebarví celé rozhraní** – každý z 8 profilů má vlastní navigaci, horní lištu a dvoubarevný přechod pro aktivní prvky (Midnight Graphite: ocelově modrá → modrá, Tokyo Night: modrá → fialová, Nord Frost: petrolejová → ledově modrá, Catppuccin Mocha: levandulová → pastelově růžová, Emerald Terminal: smaragdová → tyrkysová, Walnut: měděná → jantarová, Sandstone: bronzová → medová, Arctic Light: královská → azurová). Aktivní záložka/panel s rámečkem v přechodu profilu, navigace v barvě profilu.
+- **Nové nastavení Styl rozhraní: Výrazný / Jemný** (Nastavení → Vzhled) – síla přechodů, stínů a zvýraznění. Barevný profil a styl jsou dvě samostatné volby (např. Walnut + Výrazný).
+- Velikosti tlačítek, lišt a rozložení se nemění. Významové barvy zůstávají: zelená připojeno, oranžová upozornění, červená chyba.
