@@ -776,3 +776,12 @@ Bezpečnostní úpravy podle revize Project CodeGuard:
 - **Barevný profil přebarví celé rozhraní** – každý z 8 profilů má vlastní navigaci, horní lištu a dvoubarevný přechod pro aktivní prvky (Midnight Graphite: ocelově modrá → modrá, Tokyo Night: modrá → fialová, Nord Frost: petrolejová → ledově modrá, Catppuccin Mocha: levandulová → pastelově růžová, Emerald Terminal: smaragdová → tyrkysová, Walnut: měděná → jantarová, Sandstone: bronzová → medová, Arctic Light: královská → azurová). Aktivní záložka/panel s rámečkem v přechodu profilu, navigace v barvě profilu.
 - **Nové nastavení Styl rozhraní: Výrazný / Jemný** (Nastavení → Vzhled) – síla přechodů, stínů a zvýraznění. Barevný profil a styl jsou dvě samostatné volby (např. Walnut + Výrazný).
 - Velikosti tlačítek, lišt a rozložení se nemění. Významové barvy zůstávají: zelená připojeno, oranžová upozornění, červená chyba.
+
+## 0.43.0
+
+- **Nový barevný profil Neon Orchid** – křiklavá růžovofialová: sytě fialová navigace a horní lišta s výrazným přechodem fialová → neonově růžová, světlé pracovní plochy (terminál) s tmavým textem. Funguje se stylem Výrazný i Jemný.
+- Při výběru Neon Orchid se nabídne přebarvení pravidel zvýraznění do sytých odstínů pro světlý terminál (ACTIVE zeleně, STANDBY fialově, IP modře).
+- **Neon Orchid podle přesné specifikace barev:** hlavní pozadí #281235, sidebar #30143F, horní lišta s přechodem #482064 → #96358D, aktivní záložka ve světlém přechodu #E7C6FA → #CF9FEE s tmavým textem, vybraný server v přechodu #8C28BD → #70209C, akcent a kurzor #922DD0, světlejší stavové tečky (#67DA91 / #F1BF69 / #FF829D). Pracovní plocha zůstává jednolitá #F7F3FA s tmavým švestkovým textem, přechody jen v lištách, aktivních prvcích a ikonách.
+- Zvýraznění terminálu pro Neon Orchid: ACTIVE #28663A, STANDBY #7837A0, BOOTING #805015 na #F8E7C7, IP #3E42A3, hostname #66317F, eth/bond #086D73, TX #8B521D, RX #8C3977, chyby #B0274B.
+- **Nový barevný profil Anthracite Steel** – antracit, grafit a ocelově šedá se stříbrnými akcenty, světle šedá pracovní plocha #F2F3F4. Neutrálnější než Midnight Graphite, ale s výraznými přechody: horní lišta #303336 → #565B60, aktivní záložka ve stříbrném přechodu #E1E4E7 → #BEC4CA s tmavým textem a proužkem #59636D, vybraný server v grafitovém přechodu #555E67 → #424A52 se světlým levým proužkem #D9DFE5, stavové tečky #74D39A / #E8BE73 / #F08B94.
+  Zvýraznění terminálu: ACTIVE #2D6847, STANDBY #73528D, BOOTING #805318 na #F5E7CC, IP #345F8C, hostname #465568, eth/bond #236B70, TX #895720, RX #81516F, chyby #AC3547.

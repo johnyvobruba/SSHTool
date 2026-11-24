@@ -266,9 +266,9 @@ struct SidebarSessionRow: View {
         }
         .padding(.vertical, comfortable ? 6 : 3)
         .padding(.leading, 8).padding(.trailing, 6)
-        .background(RoundedRectangle(cornerRadius: 6).fill(active ? UI.rowSelected : SwiftUI.Color.clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(Modern.selFill(active, normal: UI.rowSelected)))
         .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2).fill(UI.accent).frame(width: 3).padding(.vertical, 4)
+            RoundedRectangle(cornerRadius: 2).fill(Modern.selStripe).frame(width: 3).padding(.vertical, 4)
                 .opacity(active ? 1 : 0)
         }
         .tip("\(session.name)\n\(session.user.isEmpty ? "" : session.user + "@")\(session.host):\(session.port) · \(session.group)\n\(state?.label ?? "Bez otevřené relace")"
@@ -321,7 +321,7 @@ struct TabCard: View {
             StatusDot(color: tab.state.color, size: 5)
             Text(title)
                 .font(.system(size: 11, weight: focused ? .semibold : .regular))
-                .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
+                .foregroundStyle(Modern.tabText(selected, tab.running ? UI.text : UI.textSecondary))
                 .lineLimit(1)
                 .frame(maxWidth: 140, alignment: .leading)          // dlouhý název se zkrátí „…“
             EnvBadge(tag: tab.session.envTag)
@@ -344,9 +344,9 @@ struct TabCard: View {
         .frame(height: 22)
         .fixedSize(horizontal: true, vertical: false)              // karta jen tak široká, jak je potřeba
         .frame(minWidth: 70)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? UI.cardSelected : UI.card))
+        .background(RoundedRectangle(cornerRadius: 6).fill(Modern.tabFill(selected, inactive: UI.card)))
         .overlay(alignment: .bottom) {
-            Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 6)
+            Rectangle().fill(Modern.tabIndicator).frame(height: 2).padding(.horizontal, 6)
                 .opacity(focused ? 1 : 0)
         }
         .contentShape(Rectangle())
@@ -384,7 +384,7 @@ struct TabCard: View {
                 HStack(spacing: 5) {
                     Text(title)
                         .font(.system(size: 12, weight: focused ? .semibold : .medium))
-                        .foregroundStyle(tab.running ? UI.text : UI.textSecondary)
+                        .foregroundStyle(Modern.tabText(selected, tab.running ? UI.text : UI.textSecondary))
                         .lineLimit(1)
                     EnvBadge(tag: tab.session.envTag)
                 }
@@ -411,9 +411,9 @@ struct TabCard: View {
         .padding(.horizontal, 10)
         .frame(height: 38)
         .frame(minWidth: 130, maxWidth: 220)
-        .background(RoundedRectangle(cornerRadius: 8).fill(selected ? UI.cardSelected : UI.card))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Modern.tabFill(selected, inactive: UI.card)))
         .overlay(alignment: .bottom) {
-            Rectangle().fill(UI.accent).frame(height: 2).padding(.horizontal, 8)
+            Rectangle().fill(Modern.tabIndicator).frame(height: 2).padding(.horizontal, 8)
                 .opacity(focused ? 1 : 0)
         }
         .contentShape(Rectangle())

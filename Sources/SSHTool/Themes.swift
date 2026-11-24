@@ -127,7 +127,35 @@ extension Theme {
         ansiNormal: ["#3D332B", "#AD3F32", "#356344", "#795019", "#3F5E7A", "#735581", "#306B6B", "#6E5D4D"],
         ansiBright: ["#796652", "#C2513F", "#447A55", "#8F6224", "#52738F", "#886896", "#3E8080", "#3D332B"])
 
-    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .walnut, .sandstone, .arctic]
+    /// Neon Orchid – sytě fialová navigace, neonově růžové akcenty, světlé pracovní plochy
+    /// (seznam souborů / terminál) s tmavým textem. Tmavé lišty + světlý obsah.
+    static let orchid = Theme(
+        id: "orchid", name: "Neon Orchid", note: "Výrazný · sytá fialová, neonová růžová, světlé plochy", isDark: true,
+        appBackground: "#281235", sidebarBackground: "#30143F", toolbarBackground: "#39164D",
+        tabInactiveBackground: "#4B245E", tabActiveBackground: "#6A3388",
+        itemSelectedBackground: "#8C28BD", itemHoverBackground: "#58316B", borderColor: "#634173",
+        textPrimary: "#FCF8FF", textSecondary: "#CFB7DE", textTertiary: "#A88DB8", accentColor: "#922DD0",
+        statusConnected: "#67DA91", statusConnecting: "#F1BF69", statusError: "#FF829D",
+        foreground: "#32183F", background: "#F7F3FA", cursor: "#922DD0", cursorText: "#FFFFFF",
+        selectionBackground: "#E4C5F5",
+        ansiNormal: ["#32183F", "#B0274B", "#28663A", "#805015", "#3E42A3", "#7837A0", "#086D73", "#705D7D"],
+        ansiBright: ["#705D7D", "#B0274B", "#28663A", "#8B521D", "#345DA8", "#795096", "#086D73", "#32183F"])
+
+    /// Anthracite Steel – antracit, grafit a ocelově šedá, stříbrné akcenty; světle šedá pracovní plocha.
+    /// Neutrálnější než Midnight Graphite, ale s výraznými přechody a prostorovými ikonami.
+    static let anthracite = Theme(
+        id: "anthracite", name: "Anthracite Steel", note: "Výrazný · antracit, grafit, stříbro, světlé plochy", isDark: true,
+        appBackground: "#232527", sidebarBackground: "#292C2F", toolbarBackground: "#2D3033",
+        tabInactiveBackground: "#3C4044", tabActiveBackground: "#4A5056",
+        itemSelectedBackground: "#555E67", itemHoverBackground: "#484D52", borderColor: "#555B61",
+        textPrimary: "#F5F6F7", textSecondary: "#BDC3C9", textTertiary: "#8E959C", accentColor: "#C4CBD2",
+        statusConnected: "#74D39A", statusConnecting: "#E8BE73", statusError: "#F08B94",
+        foreground: "#292D31", background: "#F2F3F4", cursor: "#56616C", cursorText: "#FFFFFF",
+        selectionBackground: "#CFD6DD",
+        ansiNormal: ["#292D31", "#AC3547", "#2D6847", "#805318", "#345F8C", "#73528D", "#236B70", "#616970"],
+        ansiBright: ["#616970", "#AC3547", "#2D6847", "#895720", "#426894", "#746080", "#236B70", "#292D31"])
+
+    static let all: [Theme] = [.midnight, .tokyo, .nord, .catppuccin, .emerald, .walnut, .orchid, .anthracite, .sandstone, .arctic]
 
     static func byID(_ id: String) -> Theme { all.first { $0.id == id } ?? .midnight }
 }

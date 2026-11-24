@@ -103,10 +103,20 @@ struct RulePalette {
     static let sandstone = RulePalette(active: "#356344", standby: "#735581", bootingFg: "#795019", bootingBg: "#F1DFBA",
                                        ip: "#52652E", hostname: "#80502F", iface: "#306B6B", tx: "#885718", rx: "#80516F", error: "#AD3F32")
 
+    /// Neon Orchid – světlý terminál: syté odstíny (zelená ACTIVE, fialová STANDBY, modré IP, petrolejová rozhraní).
+    static let orchid = RulePalette(active: "#28663A", standby: "#7837A0", bootingFg: "#805015", bootingBg: "#F8E7C7",
+                                    ip: "#3E42A3", hostname: "#66317F", iface: "#086D73", tx: "#8B521D", rx: "#8C3977", error: "#B0274B")
+
+    /// Anthracite Steel – světlý terminál #F2F3F4, tlumené přírodní odstíny.
+    static let anthracite = RulePalette(active: "#2D6847", standby: "#73528D", bootingFg: "#805318", bootingBg: "#F5E7CC",
+                                        ip: "#345F8C", hostname: "#465568", iface: "#236B70", tx: "#895720", rx: "#81516F", error: "#AC3547")
+
     static func forTheme(_ id: String) -> RulePalette? {
         switch id {
         case "walnut": return .walnut
         case "sandstone": return .sandstone
+        case "orchid": return .orchid
+        case "anthracite": return .anthracite
         default: return nil
         }
     }
