@@ -140,10 +140,10 @@ enum ExternalSecrets {
             let a = NSAlert()
             a.messageText = title
             a.informativeText = text
-            let f = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+            let f = RevealPasswordField(width: 260)
             a.accessoryView = f
             a.addButton(withTitle: "OK"); a.addButton(withTitle: "Zrušit")
-            a.window.initialFirstResponder = f
+            a.window.initialFirstResponder = f.secure
             a.window.level = .floating
             return a.runModal() == .alertFirstButtonReturn && !f.stringValue.isEmpty ? f.stringValue : nil
         }

@@ -1184,7 +1184,7 @@ struct PasswordSourceFields: View {
                               : "Heslo se načte z \(k.title) až při připojení a nikam se neukládá. \(k == .onepassword ? "Ověření řeší aplikace 1Password (Touch ID)." : "Při připojení se zeptá na heslo k trezoru / databázi.")")
                 .font(.caption).foregroundStyle(k.cli == nil ? Color.orange : .secondary)
         } else {
-            SecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
+            RevealSecureField(m.session.hasStoredPassword ? "Heslo (uloženo, vyplň jen pro změnu)" : "Heslo", text: $m.password)
             Toggle("Před použitím hesla vyžadovat Touch ID / heslo Macu", isOn: $m.session.requireUserAuth)
             Text("Heslo je jen v Klíčence macOS, nikdy v souboru serverů ani v exportu.")
                 .font(.caption).foregroundStyle(.secondary)

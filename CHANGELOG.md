@@ -785,3 +785,7 @@ Bezpečnostní úpravy podle revize Project CodeGuard:
 - Zvýraznění terminálu pro Neon Orchid: ACTIVE #28663A, STANDBY #7837A0, BOOTING #805015 na #F8E7C7, IP #3E42A3, hostname #66317F, eth/bond #086D73, TX #8B521D, RX #8C3977, chyby #B0274B.
 - **Nový barevný profil Anthracite Steel** – antracit, grafit a ocelově šedá se stříbrnými akcenty, světle šedá pracovní plocha #F2F3F4. Neutrálnější než Midnight Graphite, ale s výraznými přechody: horní lišta #303336 → #565B60, aktivní záložka ve stříbrném přechodu #E1E4E7 → #BEC4CA s tmavým textem a proužkem #59636D, vybraný server v grafitovém přechodu #555E67 → #424A52 se světlým levým proužkem #D9DFE5, stavové tečky #74D39A / #E8BE73 / #F08B94.
   Zvýraznění terminálu: ACTIVE #2D6847, STANDBY #73528D, BOOTING #805318 na #F5E7CC, IP #345F8C, hostname #465568, eth/bond #236B70, TX #895720, RX #81516F, chyby #AC3547.
+
+## 0.44.0
+
+- **Zobrazení hesla při psaní** – u polí pro heslo je ikona oka: kliknutím se heslo ukáže jako text a zpět. Výchozí stav je vždy skrytý; v dialogu se dvěma poli (heslo + kontrola) přepíná oko obě najednou. Platí pro heslo v úpravě serveru a dotaz na heslo k trezoru (externí správci hesel).
