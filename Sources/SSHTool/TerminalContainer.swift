@@ -17,6 +17,8 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
     private(set) var process: LocalProcess?
     private var adapter: ProcessAdapter?
     private(set) var isRunning = false
+    /// Lokální terminál: ukládání serverů z příkazu ssh do „Nezařazené“.
+    private var localCapture: LocalSSHCapture?
     var onTerminated: (@MainActor (Int32?) -> Void)?
     /// Klik do terminálu (rozdělené zobrazení → přesun fokusu na tento panel).
     var onFocus: (@MainActor () -> Void)?
@@ -143,6 +145,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
             process.startProcess(executable: shell, args: ["-l"], environment: envList,
                                  execName: (shell as NSString).lastPathComponent,
                                  currentDirectory: NSHomeDirectory())
+            if process.shellPid > 0 { localCapture = LocalSSHCapture(shellPid: process.shellPid) }
         case .ftp:
             // FTP/FTPS záložka nemá vlastní proces – soubory obsluhuje prohlížeč (curl na každou operaci)
             isRunning = false
@@ -173,6 +176,7 @@ final class SSHTerminalView: TerminalView, TerminalViewDelegate {
     }
 
     func stop() {
+        localCapture?.stop(); localCapture = nil
         stopLogging()
         guard isRunning else { return }
         process?.terminate()

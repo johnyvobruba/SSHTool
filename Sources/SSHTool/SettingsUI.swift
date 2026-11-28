@@ -370,6 +370,7 @@ struct SettingsRootView: View {
 struct SettingsGeneralPane: View {
     @AppStorage("SSHTool.highlightAltScreen") private var highlightAltScreen = false
     @AppStorage("SSHTool.compactTabs") private var compactTabs = true
+    @AppStorage(LocalSSHCapture.settingKey) private var captureLocalSSH = true
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
@@ -380,6 +381,10 @@ struct SettingsGeneralPane: View {
                     .tip("Kompaktní: název a IP na jednom řádku – IP vždy celá, dlouhý název se zkrátí „…“. Dvouřádkový: IP pod názvem.")
             }
             SKRow("Zobrazit sekci Oblíbené") { SKToggle(isOn: $store.settings.showFavorites) }
+            SKRow("Ukládat SSH z lokálního terminálu",
+                  help: "Server, ke kterému se připojíš příkazem ssh v lokálním terminálu, se uloží do složky „\(LocalSSHCapture.group)“ – jen pokud ho ještě nemáš uložený. Ukládá se uživatel, server, port, klíč a jump host, žádná hesla.") {
+                SKToggle(isOn: $captureLocalSSH)
+            }
             SKRow("Kompaktní záložky", help: "Jeden řádek a menší písmo – víc otevřených relací v liště. Host a typ relace jsou v nápovědě po najetí myší.") {
                 SKToggle(isOn: $compactTabs)
             }
