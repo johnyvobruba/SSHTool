@@ -361,7 +361,7 @@ final class AppStore: ObservableObject {
     /// Session seskupené podle skupiny (abecedně), uvnitř podle názvu.
     var groupedSessions: [(group: String, items: [SSHSession])] {
         Dictionary(grouping: sessions, by: \.group)
-            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .sorted { Self.folderLess($0.key, $1.key) }
             .map { ($0.key, $0.value.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) }
     }
 
@@ -598,7 +598,15 @@ final class AppStore: ObservableObject {
             let parts = g.split(separator: "/").map(String.init)
             for i in parts.indices { set.insert(parts[...i].joined(separator: "/")) }
         }
-        return set.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return set.sorted(by: Self.folderLess)
+    }
+
+    /// Pořadí složek: abecedně, „Nezařazené“ (servery z lokálního terminálu) vždy na konci.
+    nonisolated static func folderLess(_ a: String, _ b: String) -> Bool {
+        let g = LocalSSHCapture.group
+        let ua = a == g || a.hasPrefix(g + "/"), ub = b == g || b.hasPrefix(g + "/")
+        if ua != ub { return ub }
+        return a.localizedStandardCompare(b) == .orderedAscending
     }
 
     /// Je cesta `p` v podstromu složky `root` (včetně jí samotné)?

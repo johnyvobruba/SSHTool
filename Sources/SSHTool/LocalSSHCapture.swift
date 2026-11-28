@@ -7,8 +7,8 @@ import Darwin
 /// Ukládá jen uživatele, server, port, klíč (-i) a jump host (-J) – žádná hesla ani další volby (-o).
 @MainActor
 final class LocalSSHCapture {
-    static let group = "Nezařazené"
-    static let settingKey = "SSHTool.captureLocalSSH"
+    nonisolated static let group = "Nezařazené"
+    nonisolated static let settingKey = "SSHTool.captureLocalSSH"
     static var enabled: Bool { UserDefaults.standard.object(forKey: settingKey) as? Bool ?? true }
 
     private let shellPid: pid_t

@@ -794,3 +794,9 @@ Bezpečnostní úpravy podle revize Project CodeGuard:
 
 - **Složka „Nezařazené“ pro servery z lokálního terminálu** – když se v lokálním terminálu připojíš příkazem `ssh` (i přes alias z ~/.ssh/config nebo z historie), server se automaticky uloží do složky Nezařazené. Pokud ho už máš uložený (stejný server, port a uživatel) nebo jsi ho smazal do koše, nic se nevytváří. Ukládá se jen uživatel, server, port, klíč (-i) a jump host (-J), žádná hesla ani další volby. Odtud ho můžeš přesunout do vlastní složky nebo upravit.
 - Vypnout jde v Nastavení → Obecné → „Ukládat SSH z lokálního terminálu“.
+- Složka Nezařazené je v seznamu serverů vždy na konci (ostatní složky abecedně).
+
+## 1.0.0
+
+- plna verze
+- pokud naleznete chyby dejte vedet

@@ -90,7 +90,7 @@ struct SessionListView: View {
             if !ui.search.isEmpty { n.children.removeAll { $0.total == 0 } }
             return n.total
         }
-        roots.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        roots.sort { AppStore.folderLess($0.path, $1.path) }      // „Nezařazené“ vždy na konci
         roots.forEach { _ = finish($0) }
         return ui.search.isEmpty ? roots : roots.filter { $0.total > 0 }
     }
